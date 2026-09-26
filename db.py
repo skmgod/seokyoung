@@ -163,6 +163,13 @@ CREATE TABLE IF NOT EXISTS allocations (
     amount BIGINT NOT NULL
 );
 
+-- 엑셀 가져오기 미리보기 임시 보관
+CREATE TABLE IF NOT EXISTS import_jobs (
+    token TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    created TEXT DEFAULT {now}
+);
+
 CREATE INDEX IF NOT EXISTS idx_units_building ON units(building_id);
 CREATE INDEX IF NOT EXISTS idx_bills_unit ON bills(unit_id, ym);
 CREATE INDEX IF NOT EXISTS idx_bill_lines_bill ON bill_lines(bill_id);
@@ -173,7 +180,7 @@ CREATE INDEX IF NOT EXISTS idx_alloc_payment ON allocations(payment_id);
 """.format(**_TYPES)
 
 TABLES = ["users", "settings", "buildings", "units", "fee_items", "building_fees", "unit_fees", "readings",
-          "building_bills", "bills", "bill_lines", "payments", "allocations"]
+          "building_bills", "bills", "bill_lines", "payments", "allocations", "import_jobs"]
 
 DEFAULT_SETTINGS = {
     "company_name": "",
@@ -227,17 +234,11 @@ class PgConn:
         self.conn.rollback()
 
 
-_pool = None
-
-
-def _pg_pool():
-    global _pool
-    if _pool is None:
-        from psycopg_pool import ConnectionPool
-        # prepare_threshold=None: Supabase 연결 풀러(트랜잭션 모드)와 함께 쓰기 위해 준비된 문장을 끈다
-        _pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=5, open=True, check=ConnectionPool.check_connection,
-                               kwargs={"row_factory": _row_factory, "prepare_threshold": None})
-    return _pool
+def connect_pg():
+    import psycopg
+    # 서버리스(Vercel)에서는 요청마다 새로 연결한다. 연결 재사용은 Supabase 연결 풀러가 맡는다.
+    # prepare_threshold=None: 풀러(트랜잭션 모드)에서는 준비된 문장을 쓸 수 없으므로 끈다.
+    return psycopg.connect(DATABASE_URL, row_factory=_row_factory, prepare_threshold=None, connect_timeout=10)
 
 
 # ---------------------------------------------------------------- 공통
@@ -252,7 +253,7 @@ def connect_sqlite(path):
 def get_db():
     if "db" not in g:
         if IS_PG:
-            g.pg_raw = _pg_pool().getconn()
+            g.pg_raw = connect_pg()
             g.db = PgConn(g.pg_raw)
         else:
             from flask import current_app
@@ -266,15 +267,14 @@ def close_db(_exc=None):
         return
     if IS_PG:
         raw = g.pop("pg_raw")
-        raw.rollback()  # 커밋하지 않은 작업은 버린다
-        _pg_pool().putconn(raw)
+        raw.close()  # 커밋하지 않은 작업은 버려진다
     else:
         conn.close()
 
 
 def init_db(sqlite_path):
     if IS_PG:
-        with _pg_pool().connection() as raw:
+        with connect_pg() as raw:
             conn = PgConn(raw)
             for stmt in SCHEMA.split(";"):
                 if stmt.strip():

@@ -24,6 +24,18 @@
 - `.env`에는 비밀번호가 들어 있으므로 GitHub에 올라가지 않게 `.gitignore`에 들어 있습니다.
 - SQLite로 쓰던 자료는 자동으로 옮겨지지 않습니다. 필요하면 [기존 자료 가져오기]로 다시 올리세요.
 
+## Vercel에 배포하기
+
+Vercel은 파일을 저장할 수 없으므로 **Supabase 연결이 필수**입니다.
+Vercel 프로젝트 → Settings → Environment Variables에 다음 두 값을 넣고 Redeploy 하세요.
+
+| 이름 | 값 |
+|---|---|
+| `DATABASE_URL` | Supabase → Connect → **Transaction pooler**(포트 6543) 연결 문자열 (비밀번호 포함) |
+| `SECRET_KEY` | 긴 임의 문자열 (예: 비밀번호 생성기로 만든 40자 이상) |
+
+값이 빠졌거나 DB 연결에 실패하면 사이트에 원인이 표시됩니다.
+
 ## 월 업무 순서
 
 1. **빌라·세대 관리** – 빌라 등록, 공과금 부과 방식, 월 고정 관리비 항목, 세대(호수) 등록

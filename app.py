@@ -7,6 +7,7 @@ import secrets
 
 from flask import (Flask, abort, flash, g, jsonify, redirect, render_template, request, send_file, session,
                    url_for)
+from markupsafe import escape
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from dotenv import load_dotenv
@@ -18,21 +19,36 @@ import importer  # noqa: E402
 from db import IS_PG, close_db, get_db, get_settings, init_db  # noqa: E402
 
 app = Flask(__name__, instance_relative_config=True)
-os.makedirs(app.instance_path, exist_ok=True)
-
-# 로그인 세션 암호화 키. 클라우드에서는 환경변수 SECRET_KEY 로 지정한다.
-app.secret_key = os.environ.get("SECRET_KEY")
-if not app.secret_key:
-    _key_file = os.path.join(app.instance_path, "secret.key")
-    if not os.path.exists(_key_file):
-        with open(_key_file, "w") as f:
-            f.write(secrets.token_hex(32))
-    with open(_key_file) as f:
-        app.secret_key = f.read().strip()
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
-
-init_db(os.path.join(app.instance_path, "housing.db"))
 app.teardown_appcontext(close_db)
+
+# Vercel 같은 서버리스 환경은 파일 시스템이 읽기 전용이고 요청이 끝나면 서버가 사라진다.
+# 그래서 자료는 반드시 Supabase(DATABASE_URL)에, 로그인 키는 SECRET_KEY 환경변수에 둬야 한다.
+ON_SERVERLESS = bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
+CONFIG_ERRORS = []
+
+app.secret_key = os.environ.get("SECRET_KEY")
+if ON_SERVERLESS:
+    if not IS_PG:
+        CONFIG_ERRORS.append("DATABASE_URL 환경변수가 없습니다. Supabase 연결 문자열을 넣어야 자료가 저장됩니다.")
+    if not app.secret_key:
+        CONFIG_ERRORS.append("SECRET_KEY 환경변수가 없습니다. 긴 임의 문자열을 넣어야 로그인이 유지됩니다.")
+        app.secret_key = secrets.token_hex(32)
+else:
+    os.makedirs(app.instance_path, exist_ok=True)
+    if not app.secret_key:
+        _key_file = os.path.join(app.instance_path, "secret.key")
+        if not os.path.exists(_key_file):
+            with open(_key_file, "w") as f:
+                f.write(secrets.token_hex(32))
+        with open(_key_file) as f:
+            app.secret_key = f.read().strip()
+
+if not CONFIG_ERRORS:
+    try:
+        init_db(os.path.join(app.instance_path, "housing.db"))
+    except Exception as e:  # 연결 문자열·비밀번호 오류 등을 화면에 보여주기 위해 잡는다
+        CONFIG_ERRORS.append(f"데이터베이스에 연결하지 못했습니다: {type(e).__name__}: {e}")
 
 
 # ---------------------------------------------------------------- 공통
@@ -72,6 +88,14 @@ PUBLIC = {"login", "setup", "static"}
 
 @app.before_request
 def guard():
+    if CONFIG_ERRORS:
+        items = "".join(f"<li>{escape(e)}</li>" for e in CONFIG_ERRORS)
+        return (f"<!doctype html><meta charset='utf-8'><title>설정 필요</title>"
+                f"<div style='font-family:sans-serif;max-width:640px;margin:10vh auto;line-height:1.6'>"
+                f"<h2>서버 설정이 필요합니다</h2><ul>{items}</ul>"
+                f"<p>Vercel 프로젝트 → Settings → Environment Variables 에 값을 넣은 뒤 다시 배포(Redeploy)하세요.</p></div>", 503)
+    if request.endpoint == "static":
+        return None
     db = get_db()
     g.user = None
     if request.endpoint in PUBLIC:
@@ -690,8 +714,11 @@ def import_page():
             flash(f"파일을 읽지 못했습니다: {e}", "error")
             return redirect(url_for("import_page"))
         token = secrets.token_hex(8)
-        with open(os.path.join(app.instance_path, f"import_{token}.json"), "w", encoding="utf-8") as fp:
-            json.dump(data["rows"], fp, ensure_ascii=False)
+        db = get_db()
+        # 미리보기 자료는 DB에 잠시 보관한다(서버리스 환경에서는 파일을 쓸 수 없음)
+        db.execute("DELETE FROM import_jobs WHERE created < ?", ((dt.datetime.now() - dt.timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"),))
+        db.execute("INSERT INTO import_jobs(token, data) VALUES (?, ?)", (token, json.dumps(data["rows"], ensure_ascii=False)))
+        db.commit()
         prev_ym = billing.add_months(this_ym(), -1)
         return render_template("import_preview.html", data=data, token=token, carry_ym=prev_ym, carry_date=today())
     return render_template("import.html")
@@ -703,16 +730,15 @@ def import_commit():
     token = f_str("token")
     if not token.isalnum():
         abort(400)
-    path = os.path.join(app.instance_path, f"import_{token}.json")
-    if not os.path.exists(path):
+    db = get_db()
+    job = db.execute("SELECT data FROM import_jobs WHERE token = ?", (token,)).fetchone()
+    if job is None:
         flash("미리보기 자료가 만료되었습니다. 파일을 다시 올려주세요.", "error")
         return redirect(url_for("import_page"))
-    with open(path, encoding="utf-8") as fp:
-        rows = json.load(fp)
-    db = get_db()
+    rows = json.loads(job["data"])
     stats = importer.commit(db, rows, f_str("carry_ym") or this_ym(), f_str("carry_date") or today())
+    db.execute("DELETE FROM import_jobs WHERE token = ?", (token,))
     db.commit()
-    os.remove(path)
     flash(f"가져오기 완료: 빌라 {stats['buildings']}곳 추가, 세대 {stats['units_new']}곳 추가 / {stats['units_updated']}곳 갱신, "
           f"이월 미납 {stats['carry']}건", "ok")
     return redirect(url_for("buildings"))
