@@ -27,7 +27,7 @@
     <div class="group">환경</div>
     <a href="{{ url_for('settings_page') }}" class="{{ 'on' if ep == 'settings_page' }}">설정</a>
     {% if user.is_admin %}<a href="{{ url_for('import_page') }}" class="{{ 'on' if ep in ('import_page','import_commit') }}">기존 자료 가져오기</a>{% endif %}
-    <div class="me">{{ user.name }}님<br><a href="{{ url_for('password') }}">비밀번호 변경</a> · <a href="{{ url_for('logout') }}">로그아웃</a></div>
+    <div class="me">{{ user.name }}님<br><a href="{{ url_for('password') }}">비밀번호 변경</a> · <a href="{{ url_for('logout') }}">로그아웃</a><br><span style="color:#7f91a5">저장소: {{ db_kind }}</span></div>
   </nav>
   <main class="main">
     {% for cat, msg in get_flashed_messages(with_categories=true) %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}

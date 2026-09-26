@@ -175,14 +175,14 @@ def calculate_building(conn, building_id, ym, due_date, issued):
             if conn.execute("SELECT 1 FROM allocations WHERE bill_id = ?", (old["id"],)).fetchone():
                 result["had_payments"].append(u["ho"])
             conn.execute("DELETE FROM bills WHERE id = ?", (old["id"],))
-        cur = conn.execute(
-            "INSERT INTO bills(unit_id, ym, kind, amount, late_fee, due_date, issued) VALUES (?, ?, 'normal', ?, ?, ?, ?)",
+        bill_id = conn.execute(
+            "INSERT INTO bills(unit_id, ym, kind, amount, late_fee, due_date, issued) VALUES (?, ?, 'normal', ?, ?, ?, ?) RETURNING id",
             (u["id"], ym, total, late_fee, due_date, issued),
-        )
+        ).fetchone()[0]
         for i, (name, amt, detail) in enumerate(lines):
             conn.execute(
                 "INSERT INTO bill_lines(bill_id, name, amount, detail, sort) VALUES (?, ?, ?, ?, ?)",
-                (cur.lastrowid, name, amt, detail, i),
+                (bill_id, name, amt, detail, i),
             )
         reallocate_unit(conn, u["id"])
         result["created"] += 1
@@ -228,8 +228,8 @@ def _owed(bl, asof):
 
 BILL_STATUS_SQL = """
 SELECT b.*, u.ho, u.tenant, u.mobile, u.phone, u.building_id, bd.name AS building_name,
-       COALESCE(SUM(a.amount), 0) AS paid,
-       COALESCE(SUM(CASE WHEN p.pay_date <= b.due_date THEN a.amount END), 0) AS paid_by_due
+       CAST(COALESCE(SUM(a.amount), 0) AS BIGINT) AS paid,
+       CAST(COALESCE(SUM(CASE WHEN p.pay_date <= b.due_date THEN a.amount END), 0) AS BIGINT) AS paid_by_due
 FROM bills b
 JOIN units u ON u.id = b.unit_id
 JOIN buildings bd ON bd.id = u.building_id
@@ -242,7 +242,7 @@ def bill_statuses(conn, where="1=1", params=(), asof=None):
     """고지 건별 수납/미납 현황. asof(기준일) 이후 납부기한이 지난 건은 연체료를 더한다."""
     asof = asof or dt.date.today().isoformat()
     rows = conn.execute(
-        BILL_STATUS_SQL + f" WHERE {where} GROUP BY b.id ORDER BY bd.name, u.ho, b.ym", params
+        BILL_STATUS_SQL + f" WHERE {where} GROUP BY b.id, u.id, bd.id ORDER BY bd.name, u.ho, b.ym", params
     ).fetchall()
     out = []
     for r in rows:
@@ -255,9 +255,9 @@ def bill_statuses(conn, where="1=1", params=(), asof=None):
 
 def unit_credit(conn, unit_id):
     """배정되지 않은 수납액(선납금)."""
-    paid = conn.execute("SELECT COALESCE(SUM(amount),0) FROM payments WHERE unit_id = ?", (unit_id,)).fetchone()[0]
+    paid = conn.execute("SELECT CAST(COALESCE(SUM(amount), 0) AS BIGINT) FROM payments WHERE unit_id = ?", (unit_id,)).fetchone()[0]
     alloc = conn.execute(
-        "SELECT COALESCE(SUM(a.amount),0) FROM allocations a JOIN payments p ON p.id = a.payment_id WHERE p.unit_id = ?",
+        "SELECT CAST(COALESCE(SUM(a.amount), 0) AS BIGINT) FROM allocations a JOIN payments p ON p.id = a.payment_id WHERE p.unit_id = ?",
         (unit_id,),
     ).fetchone()[0]
     return paid - alloc

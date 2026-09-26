@@ -156,14 +156,15 @@ def commit(conn, rows, carry_ym, carry_date):
     stats = {"buildings": 0, "units_new": 0, "units_updated": 0, "carry": 0}
     mgmt_item = conn.execute("SELECT id FROM fee_items WHERE name = '일반관리비'").fetchone()
     if mgmt_item is None:
-        mgmt_item_id = conn.execute("INSERT INTO fee_items(name, sort) VALUES ('일반관리비', 0)").lastrowid
+        mgmt_item_id = conn.execute("INSERT INTO fee_items(name, sort) VALUES ('일반관리비', 0) RETURNING id").fetchone()[0]
     else:
         mgmt_item_id = mgmt_item["id"]
 
     for r in rows:
         b = conn.execute("SELECT * FROM buildings WHERE name = ?", (r["building"],)).fetchone()
         if b is None:
-            bid = conn.execute("INSERT INTO buildings(name, address) VALUES (?, ?)", (r["building"], r["address"])).lastrowid
+            bid = conn.execute("INSERT INTO buildings(name, address) VALUES (?, ?) RETURNING id",
+                               (r["building"], r["address"])).fetchone()[0]
             stats["buildings"] += 1
         else:
             bid = b["id"]
@@ -175,7 +176,7 @@ def commit(conn, rows, carry_ym, carry_date):
         if u is None:
             uid = conn.execute(
                 """INSERT INTO units(tenant, phone, mobile, move_in, status, deposit, rent, memo, building_id, ho)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", vals + (bid, r["ho"])).lastrowid
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""", vals + (bid, r["ho"])).fetchone()[0]
             stats["units_new"] += 1
         else:
             uid = u["id"]
@@ -185,16 +186,17 @@ def commit(conn, rows, carry_ym, carry_date):
             stats["units_updated"] += 1
 
         if r["mgmt"]:
-            conn.execute("INSERT OR IGNORE INTO building_fees(building_id, item_id, amount, method) VALUES (?, ?, 0, 'unit')",
+            conn.execute("INSERT INTO building_fees(building_id, item_id, amount, method) VALUES (?, ?, 0, 'unit') ON CONFLICT DO NOTHING",
                          (bid, mgmt_item_id))
-            conn.execute("INSERT OR REPLACE INTO unit_fees(unit_id, item_id, amount) VALUES (?, ?, ?)",
+            conn.execute("INSERT INTO unit_fees(unit_id, item_id, amount) VALUES (?, ?, ?) "
+                         "ON CONFLICT (unit_id, item_id) DO UPDATE SET amount = excluded.amount",
                          (uid, mgmt_item_id, r["mgmt"]))
 
         if r["unpaid"]:
             conn.execute("DELETE FROM bills WHERE unit_id = ? AND kind = 'carry'", (uid,))
             bill_id = conn.execute(
-                "INSERT INTO bills(unit_id, ym, kind, amount, late_fee, due_date, issued, memo) VALUES (?, ?, 'carry', ?, 0, ?, ?, '기존 프로그램 이월')",
-                (uid, carry_ym, r["unpaid"], carry_date, carry_date)).lastrowid
+                "INSERT INTO bills(unit_id, ym, kind, amount, late_fee, due_date, issued, memo) VALUES (?, ?, 'carry', ?, 0, ?, ?, '기존 프로그램 이월') RETURNING id",
+                (uid, carry_ym, r["unpaid"], carry_date, carry_date)).fetchone()[0]
             conn.execute("INSERT INTO bill_lines(bill_id, name, amount, detail) VALUES (?, '이월 미납액', ?, '기존 프로그램에서 이월')",
                          (bill_id, r["unpaid"]))
             reallocate_unit(conn, uid)

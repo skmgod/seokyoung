@@ -9,19 +9,26 @@ from flask import (Flask, abort, flash, g, jsonify, redirect, render_template, r
                    url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
 
-import billing
-import importer
-from db import close_db, get_db, get_settings, init_db
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+
+import billing  # noqa: E402  (DATABASE_URL 을 읽은 뒤에 불러와야 함)
+import importer  # noqa: E402
+from db import IS_PG, close_db, get_db, get_settings, init_db  # noqa: E402
 
 app = Flask(__name__, instance_relative_config=True)
 os.makedirs(app.instance_path, exist_ok=True)
 
-_key_file = os.path.join(app.instance_path, "secret.key")
-if not os.path.exists(_key_file):
-    with open(_key_file, "w") as f:
-        f.write(secrets.token_hex(32))
-with open(_key_file) as f:
-    app.secret_key = f.read().strip()
+# 로그인 세션 암호화 키. 클라우드에서는 환경변수 SECRET_KEY 로 지정한다.
+app.secret_key = os.environ.get("SECRET_KEY")
+if not app.secret_key:
+    _key_file = os.path.join(app.instance_path, "secret.key")
+    if not os.path.exists(_key_file):
+        with open(_key_file, "w") as f:
+            f.write(secrets.token_hex(32))
+    with open(_key_file) as f:
+        app.secret_key = f.read().strip()
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
 
 init_db(os.path.join(app.instance_path, "housing.db"))
@@ -56,7 +63,8 @@ def inject():
     if "csrf" not in session:
         session["csrf"] = secrets.token_hex(16)
     return {"csrf_token": session["csrf"], "METHODS": billing.METHODS, "UTILS": billing.UTILS,
-            "user": g.get("user"), "today": today(), "this_ym": this_ym()}
+            "user": g.get("user"), "today": today(), "this_ym": this_ym(),
+            "db_kind": "Supabase" if IS_PG else "이 PC (SQLite)"}
 
 
 PUBLIC = {"login", "setup", "static"}
@@ -184,9 +192,9 @@ def buildings():
     db = get_db()
     q = request.args.get("q", "").strip()
     rows = db.execute(
-        """SELECT b.*, COUNT(u.id) AS units, SUM(u.status = '공실') AS vacant
+        """SELECT b.*, COUNT(u.id) AS units, CAST(COALESCE(SUM(CASE WHEN u.status = '공실' THEN 1 ELSE 0 END), 0) AS BIGINT) AS vacant
            FROM buildings b LEFT JOIN units u ON u.building_id = b.id
-           WHERE b.active = 1 AND (b.name LIKE ? OR IFNULL(b.address,'') LIKE ? OR IFNULL(b.owner_name,'') LIKE ?)
+           WHERE b.active = 1 AND (b.name LIKE ? OR COALESCE(b.address,'') LIKE ? OR COALESCE(b.owner_name,'') LIKE ?)
            GROUP BY b.id ORDER BY b.name""", (f"%{q}%",) * 3).fetchall()
     return render_template("buildings.html", rows=rows, q=q)
 
@@ -212,14 +220,14 @@ def building_edit(bid=None):
                 db.execute(f"UPDATE buildings SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?",
                            list(vals.values()) + [bid])
             else:
-                bid = db.execute(f"INSERT INTO buildings({', '.join(vals)}) VALUES ({', '.join('?' * len(vals))})",
-                                 list(vals.values())).lastrowid
+                bid = db.execute(f"INSERT INTO buildings({', '.join(vals)}) VALUES ({', '.join('?' * len(vals))}) RETURNING id",
+                                 list(vals.values())).fetchone()[0]
             db.commit()
             flash("저장했습니다.", "ok")
             return redirect(url_for("building_edit", bid=bid))
     units, fees = [], []
     if b:
-        units = db.execute("SELECT * FROM units WHERE building_id = ? ORDER BY CAST(ho AS INTEGER), ho", (bid,)).fetchall()
+        units = db.execute("SELECT * FROM units WHERE building_id = ? ORDER BY LENGTH(ho), ho", (bid,)).fetchall()
         fees = db.execute(
             """SELECT fi.id, fi.name, bf.amount, bf.method FROM fee_items fi
                LEFT JOIN building_fees bf ON bf.item_id = fi.id AND bf.building_id = ?
@@ -235,7 +243,8 @@ def building_fees(bid):
         method = request.form.get(f"method_{item['id']}") or "unit"
         if amount or db.execute("SELECT 1 FROM unit_fees uf JOIN units u ON u.id = uf.unit_id WHERE u.building_id = ? AND uf.item_id = ?",
                                 (bid, item["id"])).fetchone():
-            db.execute("INSERT OR REPLACE INTO building_fees(building_id, item_id, amount, method) VALUES (?, ?, ?, ?)",
+            db.execute("INSERT INTO building_fees(building_id, item_id, amount, method) VALUES (?, ?, ?, ?) "
+                       "ON CONFLICT (building_id, item_id) DO UPDATE SET amount = excluded.amount, method = excluded.method",
                        (bid, item["id"], amount, method))
         else:
             db.execute("DELETE FROM building_fees WHERE building_id = ? AND item_id = ?", (bid, item["id"]))
@@ -285,14 +294,15 @@ def unit_edit(uid=None):
                 db.execute(f"UPDATE units SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", list(vals.values()) + [uid])
             else:
                 vals["building_id"] = bid
-                uid = db.execute(f"INSERT INTO units({', '.join(vals)}) VALUES ({', '.join('?' * len(vals))})",
-                                 list(vals.values())).lastrowid
+                uid = db.execute(f"INSERT INTO units({', '.join(vals)}) VALUES ({', '.join('?' * len(vals))}) RETURNING id",
+                                 list(vals.values())).fetchone()[0]
             for item in db.execute("SELECT item_id FROM building_fees WHERE building_id = ?", (bid,)).fetchall():
                 raw = f_str(f"fee_{item['item_id']}")
                 if raw == "":
                     db.execute("DELETE FROM unit_fees WHERE unit_id = ? AND item_id = ?", (uid, item["item_id"]))
                 else:
-                    db.execute("INSERT OR REPLACE INTO unit_fees(unit_id, item_id, amount) VALUES (?, ?, ?)",
+                    db.execute("INSERT INTO unit_fees(unit_id, item_id, amount) VALUES (?, ?, ?) "
+                               "ON CONFLICT (unit_id, item_id) DO UPDATE SET amount = excluded.amount",
                                (uid, item["item_id"], f_int(f"fee_{item['item_id']}")))
             db.commit()
             flash("저장했습니다.", "ok")
@@ -345,7 +355,7 @@ def readings():
     if b is None:
         return render_template("readings.html", blist=blist, b=None, ym=ym)
     utils = [k for k in billing.UTILS if b[f"{k}_method"] in ("price", "ratio")]
-    units = db.execute("SELECT * FROM units WHERE building_id = ? ORDER BY CAST(ho AS INTEGER), ho", (bid,)).fetchall()
+    units = db.execute("SELECT * FROM units WHERE building_id = ? ORDER BY LENGTH(ho), ho", (bid,)).fetchall()
 
     if request.method == "POST":
         for u in units:
@@ -354,11 +364,13 @@ def readings():
                 if prev is None and curr is None:
                     db.execute("DELETE FROM readings WHERE unit_id = ? AND ym = ? AND util = ?", (u["id"], ym, util))
                 else:
-                    db.execute("INSERT OR REPLACE INTO readings(unit_id, ym, util, prev, curr) VALUES (?, ?, ?, ?, ?)",
+                    db.execute("INSERT INTO readings(unit_id, ym, util, prev, curr) VALUES (?, ?, ?, ?, ?) "
+                               "ON CONFLICT (unit_id, ym, util) DO UPDATE SET prev = excluded.prev, curr = excluded.curr",
                                (u["id"], ym, util, prev, curr))
         for util in list(billing.UTILS) + ["common"]:
             if f_str(f"bb_amount_{util}") or f_str(f"bb_price_{util}"):
-                db.execute("INSERT OR REPLACE INTO building_bills(building_id, ym, util, amount, unit_price) VALUES (?, ?, ?, ?, ?)",
+                db.execute("INSERT INTO building_bills(building_id, ym, util, amount, unit_price) VALUES (?, ?, ?, ?, ?) "
+                           "ON CONFLICT (building_id, ym, util) DO UPDATE SET amount = excluded.amount, unit_price = excluded.unit_price",
                            (bid, ym, util, f_int(f"bb_amount_{util}"), f_float(f"bb_price_{util}") or 0))
             else:
                 db.execute("DELETE FROM building_bills WHERE building_id = ? AND ym = ? AND util = ?", (bid, ym, util))
@@ -400,7 +412,7 @@ def calc():
             flash(f"{ymk(ym)} 관리비 계산을 마쳤습니다. 총 {sum(r['created'] for r in results)}세대, "
                   f"{sum(r['total'] for r in results):,}원", "ok")
     done = {r[0]: (r[1], r[2]) for r in db.execute(
-        """SELECT u.building_id, COUNT(*), SUM(b.amount) FROM bills b JOIN units u ON u.id = b.unit_id
+        """SELECT u.building_id, COUNT(*), CAST(SUM(b.amount) AS BIGINT) FROM bills b JOIN units u ON u.id = b.unit_id
            WHERE b.ym = ? AND b.kind = 'normal' GROUP BY u.building_id""", (ym,))}
     return render_template("calc.html", blist=blist, ym=ym, done=done, results=results,
                            due=billing.default_due_date(settings, ym))
@@ -586,7 +598,7 @@ def settings_page():
         if not g.user["is_admin"]:
             abort(403)
         for k in SETTING_KEYS:
-            db.execute("INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)", (k, request.form.get(k, "").strip()))
+            db.execute("INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", (k, request.form.get(k, "").strip()))
         db.commit()
         flash("설정을 저장했습니다.", "ok")
         return redirect(url_for("settings_page"))
@@ -717,7 +729,7 @@ def import_template():
 @app.route("/api/units")
 def api_units():
     db = get_db()
-    rows = db.execute("SELECT id, ho, tenant, status FROM units WHERE building_id = ? ORDER BY CAST(ho AS INTEGER), ho",
+    rows = db.execute("SELECT id, ho, tenant, status FROM units WHERE building_id = ? ORDER BY LENGTH(ho), ho",
                       (request.args.get("building_id", type=int),)).fetchall()
     return jsonify([dict(r) for r in rows])
 
