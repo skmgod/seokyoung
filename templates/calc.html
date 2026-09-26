@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}관리비 계산{% endblock %}
+{% block content %}
+<h1>② 관리비 계산</h1>
+<form class="toolbar"><label>부과월 <input type="month" name="ym" value="{{ ym }}" onchange="this.form.submit()"></label></form>
+
+{% if results %}
+<div class="panel">
+  <h2 style="margin-top:0">계산 결과</h2>
+  <table>
+    <tr><th>빌라</th><th class="r">세대</th><th class="r">부과 총액</th><th>확인 사항</th></tr>
+    {% for r in results %}
+    <tr><td>{{ r.building }}</td><td class="r">{{ r.created }}</td><td class="r">{{ r.total|won }}</td>
+      <td>{% if r.had_payments %}<div class="neg">수납 기록이 있던 세대 재계산: {{ r.had_payments|join(', ') }}호 (수납액은 자동 재배정)</div>{% endif %}
+        {% if r.warnings %}<ul class="warnlist">{% for w in r.warnings %}<li>{{ w }}</li>{% endfor %}</ul>{% elif not r.had_payments %}<span class="ok">이상 없음</span>{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+  <p><a class="btn" href="{{ url_for('bills', ym=ym) }}">부과 내역·고지서 보기</a></p>
+</div>
+{% endif %}
+
+<form method="post" class="panel">
+  {{ csrf() }}
+  <input type="hidden" name="ym" value="{{ ym }}">
+  <div class="toolbar">
+    <label>발행일 <input type="date" name="issued" value="{{ today }}"></label>
+    <label>납부기한 <input type="date" name="due_date" value="{{ due }}"></label>
+    <span class="grow"></span>
+    <label><input type="checkbox" onclick="document.querySelectorAll('.bchk').forEach(c => c.checked = this.checked)"> 전체 선택</label>
+  </div>
+  <table>
+    <tr><th style="width:40px"></th><th>빌라</th><th>수도</th><th>전기</th><th>가스</th><th>{{ ym|ymk }} 계산 상태</th></tr>
+    {% for b in blist %}
+    <tr><td class="c"><input type="checkbox" class="bchk" name="building_ids" value="{{ b.id }}" {{ 'checked' if b.id not in done }}></td>
+      <td><b>{{ b.name }}</b></td>
+      <td class="muted">{{ METHODS[b.water_method] if b.water_method != 'none' else '-' }}</td>
+      <td class="muted">{{ METHODS[b.elec_method] if b.elec_method != 'none' else '-' }}</td>
+      <td class="muted">{{ METHODS[b.gas_method] if b.gas_method != 'none' else '-' }}</td>
+      <td>{% if b.id in done %}<span class="tag done">계산됨</span> {{ done[b.id][0] }}세대 · {{ done[b.id][1]|won }}원{% else %}<span class="muted">미계산</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="6" class="c muted">등록된 빌라가 없습니다.</td></tr>{% endfor %}
+  </table>
+  <p class="muted">이미 계산된 빌라를 다시 계산하면 그 달의 부과 내역을 새로 만듭니다(이미 받은 수납액은 자동으로 다시 배정됩니다).</p>
+  <p><button onclick="return confirm('선택한 빌라의 {{ ym|ymk }} 관리비를 계산합니까?')">관리비 계산 실행</button></p>
+</form>
+{% endblock %}

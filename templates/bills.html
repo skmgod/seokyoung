@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}부과 내역{% endblock %}
+{% block content %}
+<h1>③ 부과 내역·고지서</h1>
+<form class="toolbar">
+  <input type="month" name="ym" value="{{ ym }}">
+  <select name="building_id"><option value="">전체 빌라</option>
+    {% for x in blist %}<option value="{{ x.id }}" {{ 'selected' if x.id == bid }}>{{ x.name }}</option>{% endfor %}</select>
+  <button class="light">조회</button>
+  <span class="grow"></span>
+  <a class="btn" target="_blank" href="{{ url_for('bills_print', ym=ym, building_id=bid or '') }}">고지서 출력 ({{ rows|length }}장)</a>
+</form>
+<table>
+  <tr><th>빌라</th><th>호수</th><th>입주자</th><th class="r">당월 부과</th><th class="r">납기후 연체료</th><th>납부기한</th><th class="r">수납</th><th class="r">미납</th><th></th></tr>
+  {% for r in rows %}
+  <tr><td>{{ r.building_name }}</td><td><a href="{{ url_for('unit_ledger', uid=r.unit_id) }}">{{ r.ho }}</a></td><td>{{ r.tenant or '' }}</td>
+    <td class="r">{{ r.amount|won }}</td><td class="r muted">{{ r.late_fee|won }}</td><td>{{ r.due_date }}</td>
+    <td class="r">{{ r.paid|won }}</td>
+    <td class="r">{% if r.owed > 0 %}<span class="neg">{{ r.owed|won }}</span>{% else %}<span class="tag done">완납</span>{% endif %}</td>
+    <td style="white-space:nowrap"><a href="{{ url_for('bills_print', ym=ym, unit_id=r.unit_id) }}" target="_blank">고지서</a>
+      <form method="post" action="{{ url_for('bill_delete', bill_id=r.id) }}" class="inline" onsubmit="return confirm('{{ r.ho }}호 부과 내역을 삭제합니까?')">{{ csrf() }}<button class="small light">삭제</button></form></td></tr>
+  {% else %}<tr><td colspan="9" class="c muted">{{ ym|ymk }} 부과 내역이 없습니다. <a href="{{ url_for('calc', ym=ym) }}">관리비 계산</a>을 먼저 하세요.</td></tr>{% endfor %}
+  {% if rows %}
+  <tr class="total"><td colspan="3">합계 ({{ rows|length }}세대)</td><td class="r">{{ rows|sum(attribute='amount')|won }}</td><td></td><td></td>
+    <td class="r">{{ rows|sum(attribute='paid')|won }}</td><td class="r">{{ rows|selectattr('owed','gt',0)|sum(attribute='owed')|won }}</td><td></td></tr>
+  {% endif %}
+</table>
+{% endblock %}

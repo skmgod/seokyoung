@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}빌라 관리{% endblock %}
+{% block content %}
+<h1>빌라·세대 관리</h1>
+<div class="toolbar">
+  <form class="grow"><input name="q" value="{{ q }}" placeholder="빌라명·주소·건물주 검색" style="width:260px"> <button class="light">조회</button></form>
+  <a class="btn" href="{{ url_for('building_edit') }}">+ 빌라 등록</a>
+</div>
+<table>
+  <tr><th>코드</th><th>빌라명</th><th>구분</th><th>주소</th><th>건물주</th><th class="r">세대</th><th class="r">공실</th><th>수도</th><th>전기</th><th>가스</th></tr>
+  {% for b in rows %}
+  <tr>
+    <td>{{ b.code or '' }}</td>
+    <td><a href="{{ url_for('building_edit', bid=b.id) }}"><b>{{ b.name }}</b></a></td>
+    <td>{{ b.kind }}</td>
+    <td>{{ b.address or '' }}</td>
+    <td>{{ b.owner_name or '' }} <span class="muted">{{ b.owner_phone or '' }}</span></td>
+    <td class="r">{{ b.units }}</td>
+    <td class="r">{{ b.vacant or 0 }}</td>
+    <td class="muted">{{ METHODS[b.water_method] if b.water_method != 'none' else '-' }}</td>
+    <td class="muted">{{ METHODS[b.elec_method] if b.elec_method != 'none' else '-' }}</td>
+    <td class="muted">{{ METHODS[b.gas_method] if b.gas_method != 'none' else '-' }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="10" class="c muted">등록된 빌라가 없습니다. [+ 빌라 등록] 또는 [기존 자료 가져오기]로 시작하세요.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

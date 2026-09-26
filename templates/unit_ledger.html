@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ u.building_name }} {{ u.ho }} 원장{% endblock %}
+{% block content %}
+<div class="toolbar"><h1 class="grow" style="margin:0">{{ u.building_name }} {{ u.ho }}호 · 세대 원장</h1>
+  <a class="btn light" href="{{ url_for('unit_edit', uid=u.id) }}">세대 정보</a>
+  <a class="btn" href="{{ url_for('payments', building_id=u.building_id, unit_id=u.id) }}">수납 입력</a></div>
+<div class="cards">
+  <div class="card"><div class="k">입주자</div><div class="v" style="font-size:17px">{{ u.tenant or '-' }}</div><div class="muted">{{ u.mobile or u.phone or '' }}</div></div>
+  <div class="card"><div class="k">현재 미납액 (연체료 포함)</div><div class="v {{ 'neg' if owed > 0 }}">{{ owed|won }}</div></div>
+  <div class="card"><div class="k">선납금 (미배정 수납액)</div><div class="v">{{ credit|won }}</div></div>
+</div>
+<h2>부과 내역</h2>
+<table>
+  <tr><th>부과월</th><th>구분</th><th class="r">당월 금액</th><th>납부기한</th><th class="r">연체료</th><th class="r">수납</th><th class="r">미납</th><th></th></tr>
+  {% for b in bills|reverse %}
+  <tr><td>{{ b.ym|ymk }}</td><td>{{ '이월 미납' if b.kind == 'carry' else '관리비' }}</td><td class="r">{{ b.amount|won }}</td>
+    <td>{{ b.due_date }}</td><td class="r">{{ b.late_applied|won if b.late_applied else '' }}</td>
+    <td class="r">{{ b.paid|won }}</td>
+    <td class="r">{% if b.owed > 0 %}<span class="neg">{{ b.owed|won }}</span>{% else %}<span class="tag done">완납</span>{% endif %}</td>
+    <td>{% if b.kind == 'normal' %}<a href="{{ url_for('bills_print', ym=b.ym, unit_id=u.id) }}" target="_blank">고지서</a>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="8" class="c muted">부과 내역이 없습니다.</td></tr>{% endfor %}
+</table>
+<h2>수납 내역</h2>
+<table>
+  <tr><th>수납일</th><th class="r">금액</th><th>방법</th><th>입금자</th><th>메모</th><th></th></tr>
+  {% for p in payments %}
+  <tr><td>{{ p.pay_date }}</td><td class="r">{{ p.amount|won }}</td><td>{{ p.method or '' }}</td><td>{{ p.payer or '' }}</td><td>{{ p.memo or '' }}</td>
+    <td><form method="post" action="{{ url_for('payment_delete', pid=p.id) }}" class="inline" onsubmit="return confirm('이 수납 기록을 삭제합니까?')">{{ csrf() }}<button class="small light">삭제</button></form></td></tr>
+  {% else %}<tr><td colspan="6" class="c muted">수납 내역이 없습니다.</td></tr>{% endfor %}
+</table>
+{% endblock %}

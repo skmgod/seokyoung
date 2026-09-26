@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}수납 입력{% endblock %}
+{% block content %}
+<h1>④ 수납 입력</h1>
+<form method="post" class="panel" action="{{ url_for('payments', d1=d1, d2=d2) }}">
+  {{ csrf() }}
+  <div class="grid">
+    <label>빌라<select name="building_id" id="bsel"><option value="">선택</option>
+      {% for x in blist %}<option value="{{ x.id }}" {{ 'selected' if x.id == sel_building }}>{{ x.name }}</option>{% endfor %}</select></label>
+    <label>호수<select name="unit_id" id="usel" required><option value="">빌라를 먼저 선택</option></select></label>
+    <label>수납일<input type="date" name="pay_date" id="pdate" value="{{ today }}" required></label>
+    <label>금액<input class="num" name="amount" id="amount" required></label>
+    <label>수납 방법<select name="method">{% for m in ['무통장입금','지로','자동이체','현금','카드','인터넷뱅킹'] %}<option>{{ m }}</option>{% endfor %}</select></label>
+    <label>입금자<input name="payer"></label>
+    <label class="wide">메모<input name="memo"></label>
+  </div>
+  <div id="balance" class="muted" style="margin:10px 0"></div>
+  <button>수납 저장</button>
+</form>
+
+<form class="toolbar">
+  <label>수납일 <input type="date" name="d1" value="{{ d1 }}"></label> ~ <input type="date" name="d2" value="{{ d2 }}">
+  <button class="light">조회</button>
+  <span class="grow"></span>
+  <span>합계 <b>{{ total|won }}</b>원 {% for k, v in by_method.items() %}<span class="tag">{{ k }} {{ v|won }}</span> {% endfor %}</span>
+</form>
+<table>
+  <tr><th>수납일</th><th>빌라</th><th>호수</th><th>입주자</th><th class="r">금액</th><th>방법</th><th>입금자</th><th>메모</th><th></th></tr>
+  {% for p in rows %}
+  <tr><td>{{ p.pay_date }}</td><td>{{ p.building_name }}</td><td><a href="{{ url_for('unit_ledger', uid=p.unit_id) }}">{{ p.ho }}</a></td><td>{{ p.tenant or '' }}</td>
+    <td class="r">{{ p.amount|won }}</td><td>{{ p.method or '' }}</td><td>{{ p.payer or '' }}</td><td>{{ p.memo or '' }}</td>
+    <td><form method="post" action="{{ url_for('payment_delete', pid=p.id) }}" class="inline" onsubmit="return confirm('이 수납 기록을 삭제합니까?')">{{ csrf() }}<button class="small light">삭제</button></form></td></tr>
+  {% else %}<tr><td colspan="9" class="c muted">기간 내 수납 기록이 없습니다.</td></tr>{% endfor %}
+</table>
+{% endblock %}
+{% block scripts %}
+<script>
+const bsel = document.getElementById('bsel'), usel = document.getElementById('usel');
+const bal = document.getElementById('balance'), amount = document.getElementById('amount'), pdate = document.getElementById('pdate');
+const wantUnit = new URLSearchParams(location.search).get('unit_id');
+const won = n => Number(n).toLocaleString();
+async function loadUnits() {
+  usel.innerHTML = '<option value="">호수 선택</option>';
+  bal.textContent = '';
+  if (!bsel.value) return;
+  const units = await (await fetch('/api/units?building_id=' + bsel.value)).json();
+  for (const u of units) {
+    const o = new Option(`${u.ho}호 ${u.tenant || ''}${u.status === '공실' ? ' (공실)' : ''}`, u.id);
+    if (String(u.id) === wantUnit) o.selected = true;
+    usel.add(o);
+  }
+  if (usel.value) loadBalance();
+}
+async function loadBalance() {
+  if (!usel.value) { bal.textContent = ''; return; }
+  const d = await (await fetch(`/api/units/${usel.value}/balance?asof=${pdate.value}`)).json();
+  const parts = d.bills.map(b => `${b.kind === 'carry' ? '이월' : b.ym} ${won(b.owed)}원`);
+  bal.innerHTML = d.owed > 0
+    ? `미납액 <b class="neg">${won(d.owed)}원</b> (${parts.join(', ')}) <button type="button" class="small light" id="fill">전액 입력</button>`
+    : `미납 없음${d.credit ? ' · 선납금 ' + won(d.credit) + '원' : ''}`;
+  const fill = document.getElementById('fill');
+  if (fill) fill.onclick = () => amount.value = won(d.owed);
+}
+bsel.onchange = loadUnits; usel.onchange = loadBalance; pdate.onchange = loadBalance;
+amount.addEventListener('blur', () => { const n = parseInt(amount.value.replace(/[^\d]/g, '')); if (n) amount.value = won(n); });
+loadUnits();
+</script>
+{% endblock %}

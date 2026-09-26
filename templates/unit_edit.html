@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ b.name }} {{ u.ho if u else '세대 추가' }}{% endblock %}
+{% block content %}
+<div class="toolbar"><h1 class="grow" style="margin:0">{{ b.name }} · {{ (u.ho ~ '호') if u else '세대 추가' }}</h1>
+  {% if u %}<a class="btn light" href="{{ url_for('unit_ledger', uid=u.id) }}">세대 원장</a>{% endif %}
+  <a class="btn light" href="{{ url_for('building_edit', bid=b.id) }}">빌라로</a></div>
+<form method="post" class="panel">
+  {{ csrf() }}
+  <div class="grid">
+    <label>호수 *<input name="ho" value="{{ u.ho if u else '' }}" required autofocus></label>
+    <label>상태<select name="status"><option>입주</option><option {{ 'selected' if u and u.status == '공실' }}>공실</option></select></label>
+    <label>입주자(계약자)<input name="tenant" value="{{ u.tenant or '' if u else '' }}"></label>
+    <label>핸드폰<input name="mobile" value="{{ u.mobile or '' if u else '' }}"></label>
+    <label>전화번호<input name="phone" value="{{ u.phone or '' if u else '' }}"></label>
+    <label>입주일<input type="date" name="move_in" value="{{ u.move_in or '' if u else '' }}"></label>
+    <label>퇴거일(이사)<input type="date" name="move_out" value="{{ u.move_out or '' if u else '' }}"></label>
+    <label>보증금<input class="num" name="deposit" value="{{ u.deposit|won if u else '' }}"></label>
+    <label>임대료(월세)<input class="num" name="rent" value="{{ u.rent|won if u else '' }}"></label>
+    <label style="flex-direction:row;align-items:center;gap:6px;margin-top:18px"><input type="checkbox" name="auto_transfer" {{ 'checked' if u and u.auto_transfer }}> 자동이체 세대</label>
+    <label class="wide">메모<textarea name="memo">{{ u.memo or '' if u else '' }}</textarea></label>
+  </div>
+  {% if fees %}
+  <h2>세대별 관리비 (비워두면 빌라 기본금액 적용)</h2>
+  <table style="max-width:460px">
+    <tr><th>항목</th><th class="r">빌라 기본</th><th class="r">이 세대 금액</th></tr>
+    {% for f in fees %}
+    <tr><td>{{ f.name }}</td><td class="r muted">{{ f.base|won }}</td>
+      <td><input class="num" name="fee_{{ f.id }}" value="{{ f.own|won if f.own is not none else '' }}" style="width:120px"></td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  <p><button name="next" value="">저장</button> {% if not u %}<button name="next" value="new" class="light">저장 후 계속 추가</button>{% endif %}</p>
+</form>
+{% if u %}
+<form method="post" action="{{ url_for('unit_delete', uid=u.id) }}" onsubmit="return confirm('{{ u.ho }}호를 삭제합니까? 부과 내역도 함께 지워집니다.')">
+  {{ csrf() }}<button class="danger small">세대 삭제</button>
+</form>
+{% endif %}
+{% endblock %}

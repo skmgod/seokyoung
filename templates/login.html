@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}로그인{% endblock %}
+{% block public %}
+<form class="login-box" method="post">
+  {{ csrf() }}
+  <h1>크라우드 주택관리</h1>
+  {% for cat, msg in get_flashed_messages(with_categories=true) %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+  <label>아이디<input name="username" autofocus required></label>
+  <label>비밀번호<input name="password" type="password" required></label>
+  <button>로그인</button>
+</form>
+{% endblock %}

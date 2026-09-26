@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ b.name if b else '빌라 등록' }}{% endblock %}
+{% block content %}
+<div class="toolbar"><h1 class="grow" style="margin:0">{{ b.name if b else '빌라 등록' }}</h1>
+  <a class="btn light" href="{{ url_for('buildings') }}">목록</a></div>
+
+<form method="post" class="panel">
+  {{ csrf() }}
+  <div class="grid">
+    <label>빌라명 *<input name="name" value="{{ b.name if b else '' }}" required></label>
+    <label>코드<input name="code" value="{{ b.code or '' if b else '' }}"></label>
+    <label>구분<select name="kind">{% for k in ['빌라','다가구','원룸','아파트','상가'] %}<option {{ 'selected' if b and b.kind == k }}>{{ k }}</option>{% endfor %}</select></label>
+    <label>우편번호<input name="zip" value="{{ b.zip or '' if b else '' }}"></label>
+    <label class="wide">주소<input name="address" value="{{ b.address or '' if b else '' }}"></label>
+    <label>건물주<input name="owner_name" value="{{ b.owner_name or '' if b else '' }}"></label>
+    <label>건물주 연락처<input name="owner_phone" value="{{ b.owner_phone or '' if b else '' }}"></label>
+    <label>담당자<input name="manager" value="{{ b.manager or '' if b else '' }}"></label>
+    <label>한전 고객번호<input name="elec_no" value="{{ b.elec_no or '' if b else '' }}"></label>
+    <label>수도 고객번호<input name="water_no" value="{{ b.water_no or '' if b else '' }}"></label>
+    <label>가스 고객번호<input name="gas_no" value="{{ b.gas_no or '' if b else '' }}"></label>
+    {% for util, label in UTILS.items() %}
+    <label>{{ label }} 부과 방식<select name="{{ util }}_method">
+      {% for k, v in METHODS.items() %}<option value="{{ k }}" {{ 'selected' if (b and b[util ~ '_method'] == k) or (not b and k == ('ratio' if util == 'water' else 'none')) }}>{{ v }}</option>{% endfor %}
+    </select></label>
+    {% endfor %}
+    <label>공용전기<select name="common_method">
+      <option value="none" {{ 'selected' if not b or b.common_method == 'none' }}>부과안함</option>
+      <option value="equal" {{ 'selected' if b and b.common_method == 'equal' }}>세대 균등 분할</option>
+    </select></label>
+    <label style="flex-direction:row;align-items:center;gap:6px;margin-top:18px"><input type="checkbox" name="bill_rent" {{ 'checked' if b and b.bill_rent }}> 임대료(월세)를 관리비와 함께 청구</label>
+    <label class="wide">메모<textarea name="memo">{{ b.memo or '' if b else '' }}</textarea></label>
+  </div>
+  <p><button>저장</button></p>
+</form>
+
+{% if b %}
+<h2 id="fees">관리비 항목 (매월 고정 부과)</h2>
+<form method="post" action="{{ url_for('building_fees', bid=b.id) }}" class="panel">
+  {{ csrf() }}
+  <p class="muted" style="margin-top:0">세대당 금액: 모든 입주 세대에 같은 금액 부과(세대 화면에서 세대별 금액 따로 지정 가능) · 총액 분할: 입력한 총액을 입주 세대수로 나눔</p>
+  <table style="max-width:560px">
+    <tr><th>항목</th><th class="r">금액</th><th>방식</th></tr>
+    {% for f in fees %}
+    <tr><td>{{ f.name }}</td>
+      <td><input class="num" name="amount_{{ f.id }}" value="{{ f.amount|won if f.amount else '' }}" style="width:120px"></td>
+      <td><select name="method_{{ f.id }}"><option value="unit">세대당 금액</option><option value="split" {{ 'selected' if f.method == 'split' }}>총액 분할</option></select></td></tr>
+    {% endfor %}
+  </table>
+  <p><button>항목 저장</button> <a href="{{ url_for('settings_page') }}#items" class="muted">항목 추가/변경은 설정에서</a></p>
+</form>
+
+<div class="toolbar"><h2 class="grow" style="margin:0">세대 ({{ units|length }})</h2>
+  <a class="btn" href="{{ url_for('unit_edit', building_id=b.id) }}">+ 세대 추가</a></div>
+<table>
+  <tr><th>호수</th><th>상태</th><th>입주자</th><th>핸드폰</th><th>입주일</th><th>퇴거일</th><th class="r">보증금</th><th class="r">임대료</th><th>자동이체</th><th></th></tr>
+  {% for u in units %}
+  <tr>
+    <td><a href="{{ url_for('unit_edit', uid=u.id) }}"><b>{{ u.ho }}</b></a></td>
+    <td><span class="tag {{ 'vacant' if u.status == '공실' }}">{{ u.status }}</span></td>
+    <td>{{ u.tenant or '' }}</td><td>{{ u.mobile or u.phone or '' }}</td>
+    <td>{{ u.move_in or '' }}</td><td>{{ u.move_out or '' }}</td>
+    <td class="r">{{ u.deposit|won }}</td><td class="r">{{ u.rent|won }}</td>
+    <td class="c">{{ '○' if u.auto_transfer }}</td>
+    <td><a href="{{ url_for('unit_ledger', uid=u.id) }}">원장</a></td>
+  </tr>
+  {% else %}
+  <tr><td colspan="10" class="c muted">세대가 없습니다.</td></tr>
+  {% endfor %}
+</table>
+
+{% if user.is_admin %}
+<details class="panel" style="margin-top:30px">
+  <summary class="neg">빌라 삭제</summary>
+  <form method="post" action="{{ url_for('building_delete', bid=b.id) }}" style="margin-top:10px">
+    {{ csrf() }}
+    <p>빌라를 삭제하면 소속 세대, 검침, 부과, 수납 자료가 모두 지워지며 복구할 수 없습니다. 확인을 위해 빌라명을 입력하세요.</p>
+    <input name="confirm_name" placeholder="{{ b.name }}"> <button class="danger">삭제</button>
+  </form>
+</details>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}설정{% endblock %}
+{% block content %}
+<h1>설정</h1>
+{% set ro = not user.is_admin %}
+<form method="post" class="panel">
+  {{ csrf() }}
+  <h2 style="margin-top:0">회사 정보 · 고지서</h2>
+  <div class="grid">
+    <label>회사명(관리사무소)<input name="company_name" value="{{ s.company_name }}"></label>
+    <label>대표 전화<input name="company_phone" value="{{ s.company_phone }}"></label>
+    <label class="wide">주소<input name="company_address" value="{{ s.company_address }}"></label>
+    <label class="wide">입금계좌 (고지서·독촉장에 표시)<input name="bank_info" value="{{ s.bank_info }}" placeholder="예) ○○은행 000-000-000000 예금주 ○○○"></label>
+    <label class="wide">고지서 안내문<textarea name="notice">{{ s.notice }}</textarea></label>
+    <label class="wide">독촉장 문구<textarea name="dunning_text">{{ s.dunning_text }}</textarea></label>
+  </div>
+  <h2>계산 규칙</h2>
+  <div class="grid">
+    <label>납기후 연체료율 (%)<input name="late_rate" value="{{ s.late_rate }}"></label>
+    <label>금액 단위<select name="round_unit">{% for u in ['1','10','100'] %}<option value="{{ u }}" {{ 'selected' if s.round_unit == u }}>{{ u }}원 단위</option>{% endfor %}</select></label>
+    <label>단위 미만 처리<select name="round_mode">
+      <option value="floor" {{ 'selected' if s.round_mode == 'floor' }}>버림(소수무시)</option>
+      <option value="round" {{ 'selected' if s.round_mode == 'round' }}>반올림</option>
+      <option value="ceil" {{ 'selected' if s.round_mode == 'ceil' }}>올림</option></select></label>
+    <label>납부기한 기본값<span style="display:flex;gap:6px;align-items:center;color:var(--text)">
+      <select name="due_offset"><option value="0" {{ 'selected' if s.due_offset == '0' }}>부과월</option><option value="1" {{ 'selected' if s.due_offset == '1' }}>다음 달</option></select>
+      <input name="due_day" value="{{ s.due_day }}" style="width:60px"> 일</span></label>
+  </div>
+  {% if not ro %}<p><button>설정 저장</button></p>{% else %}<p class="muted">설정 변경은 관리자만 할 수 있습니다.</p>{% endif %}
+</form>
+
+<form method="post" action="{{ url_for('settings_items') }}" class="panel" id="items">
+  {{ csrf() }}
+  <h2 style="margin-top:0">관리비 항목</h2>
+  <table style="max-width:480px">
+    <tr><th>순서</th><th>항목명</th><th class="c">사용</th></tr>
+    {% for i in items %}
+    <tr><td><input name="sort_{{ i.id }}" value="{{ i.sort }}" style="width:50px"></td><td><input name="name_{{ i.id }}" value="{{ i.name }}"></td>
+      <td class="c"><input type="checkbox" name="active_{{ i.id }}" {{ 'checked' if i.active }}></td></tr>
+    {% endfor %}
+    <tr><td><input name="new_sort" value="99" style="width:50px"></td><td><input name="new_name" placeholder="새 항목 추가"></td><td></td></tr>
+  </table>
+  {% if not ro %}<p><button>항목 저장</button></p>{% endif %}
+</form>
+
+{% if user.is_admin %}
+<div class="panel" id="users">
+  <h2 style="margin-top:0">사용자</h2>
+  <table style="max-width:640px">
+    <tr><th>아이디</th><th>이름</th><th>권한</th><th>생성일</th><th></th></tr>
+    {% for u in users %}
+    <tr><td>{{ u.username }}</td><td>{{ u.name }}</td><td>{{ '관리자' if u.is_admin else '직원' }}</td><td class="muted">{{ u.created }}</td>
+      <td>{% if u.id != user.id %}<form method="post" action="{{ url_for('settings_user_delete', user_id=u.id) }}" class="inline" onsubmit="return confirm('사용자 {{ u.username }}을(를) 삭제합니까?')">{{ csrf() }}<button class="small light">삭제</button></form>{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+  <form method="post" action="{{ url_for('settings_users') }}" class="toolbar" style="margin-top:12px">
+    {{ csrf() }}
+    <input name="username" placeholder="아이디" required> <input name="name" placeholder="이름">
+    <input name="password" type="password" placeholder="비밀번호(6자 이상)" required minlength="6">
+    <label><input type="checkbox" name="is_admin"> 관리자</label>
+    <button>사용자 추가</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

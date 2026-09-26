@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}처음 설정{% endblock %}
+{% block public %}
+<form class="login-box" method="post">
+  {{ csrf() }}
+  <h1>처음 설정</h1>
+  <p class="muted">프로그램을 처음 사용합니다. 관리자 계정을 만들어 주세요.</p>
+  {% for cat, msg in get_flashed_messages(with_categories=true) %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+  <label>이름<input name="name"></label>
+  <label>아이디<input name="username" required></label>
+  <label>비밀번호 (6자 이상)<input name="password" type="password" required minlength="6"></label>
+  <label>비밀번호 확인<input name="password2" type="password" required minlength="6"></label>
+  <button>관리자 계정 만들기</button>
+</form>
+{% endblock %}

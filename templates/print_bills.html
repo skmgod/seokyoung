@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>{{ ym|ymk }} 관리비 고지서</title>
+<style>
+  @page { size: A4; margin: 10mm; }
+  body { font-family: "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 12px; color: #111; margin: 0; background: #e9ecef; }
+  .bar { position: sticky; top: 0; background: #1d2b3a; color: #fff; padding: 10px 16px; display: flex; gap: 12px; align-items: center; }
+  .bar button { font: inherit; padding: 6px 14px; cursor: pointer; }
+  .sheet { background: #fff; width: 190mm; min-height: 135mm; margin: 10px auto; padding: 8mm; box-sizing: border-box; border: 1px solid #bbb; }
+  .sheet + .sheet { }
+  h1 { font-size: 20px; text-align: center; margin: 0 0 4px; letter-spacing: 4px; }
+  .sub { text-align: center; margin-bottom: 10px; }
+  .top { display: flex; justify-content: space-between; border: 2px solid #333; padding: 6px 10px; margin-bottom: 8px; }
+  .top b { font-size: 15px; }
+  .cols { display: flex; gap: 10px; }
+  .cols > div { flex: 1; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #666; padding: 3px 6px; }
+  th { background: #eee; font-weight: 600; }
+  .r { text-align: right; }
+  .c { text-align: center; }
+  .sum td { font-weight: 700; background: #f4f4f4; }
+  .pay { margin-top: 8px; }
+  .pay td { font-size: 13px; }
+  .pay .big { font-size: 16px; font-weight: 700; }
+  .notice { border: 1px dashed #666; padding: 6px 8px; margin-top: 8px; white-space: pre-wrap; }
+  .foot { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; }
+  .hist td, .hist th { font-size: 11px; padding: 2px 4px; }
+  .detail { color: #555; font-size: 10.5px; }
+  @media print {
+    body { background: #fff; }
+    .bar { display: none; }
+    .sheet { border: none; margin: 0; width: auto; min-height: 0; height: 138mm; page-break-inside: avoid; border-bottom: 1px dashed #999; }
+    .sheet.pb { page-break-after: always; border-bottom: none; }
+  }
+</style>
+</head>
+<body>
+<div class="bar"><span>{{ ym|ymk }} 관리비 고지서 {{ items|length }}장 · A4 한 장에 2세대씩 인쇄됩니다</span><button onclick="print()">인쇄</button></div>
+{% for it in items %}{% set b = it.bill %}
+<div class="sheet{{ ' pb' if loop.index is even }}">
+  <h1>관리비 고지서</h1>
+  <div class="sub">{{ ym|ymk }}분 · 발행일 {{ b.issued or '' }}</div>
+  <div class="top">
+    <div><b>{{ b.building_name }} {{ b.ho }}호</b> &nbsp; {{ b.tenant or '' }} 귀하</div>
+    <div>납부기한 <b>{{ b.due_date }}</b></div>
+  </div>
+  <div class="cols">
+    <div>
+      <table>
+        <tr><th>항목</th><th class="r">금액</th></tr>
+        {% for l in it.lines %}
+        <tr><td>{{ l.name }}{% if l.detail %}<div class="detail">{{ l.detail }}</div>{% endif %}</td><td class="r">{{ l.amount|won }}</td></tr>
+        {% endfor %}
+        <tr class="sum"><td>당월 부과액</td><td class="r">{{ b.amount|won }}</td></tr>
+      </table>
+    </div>
+    <div>
+      {% if it.meters %}
+      <table style="margin-bottom:6px">
+        <tr><th>검침</th><th class="r">전월</th><th class="r">당월</th><th class="r">사용량</th></tr>
+        {% for m in it.meters %}
+        <tr><td>{{ util_names[m.util][:-1] }}</td><td class="r">{{ fmt(m.prev) }}</td><td class="r">{{ fmt(m.curr) }}</td>
+          <td class="r">{{ fmt((m.curr or 0) - (m.prev or 0)) if m.curr is not none and m.prev is not none else '' }} {{ util_units[m.util] }}</td></tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+      {% if it.history|length > 1 %}
+      <table class="hist" style="margin-bottom:6px">
+        <tr>{% for h in it.history %}<th>{{ h.ym[5:]|int }}월</th>{% endfor %}</tr>
+        <tr>{% for h in it.history %}<td class="r">{{ h.amount|won }}</td>{% endfor %}</tr>
+      </table>
+      {% endif %}
+      <table class="pay">
+        <tr><td>당월 부과액</td><td class="r">{{ b.amount|won }}</td></tr>
+        <tr><td>이전 미납액</td><td class="r">{{ it.prev_owed|won }}</td></tr>
+        <tr class="sum"><td>납기내 금액</td><td class="r big">{{ it.before_due|won }}</td></tr>
+        <tr><td>납기후 금액 <span class="detail">(연체료 {{ b.late_fee|won }} 포함)</span></td><td class="r">{{ it.after_due|won }}</td></tr>
+      </table>
+    </div>
+  </div>
+  {% if s.bank_info %}<div class="notice"><b>입금계좌</b> {{ s.bank_info }}</div>{% endif %}
+  {% if s.notice %}<div class="notice">{{ s.notice }}</div>{% endif %}
+  <div class="foot"><span>{{ s.company_name }} {{ s.company_address }}</span><span>{{ ('문의 ' ~ s.company_phone) if s.company_phone }}</span></div>
+</div>
+{% else %}
+<div class="sheet">출력할 고지서가 없습니다.</div>
+{% endfor %}
+</body>
+</html>

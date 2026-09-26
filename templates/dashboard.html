@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}현황판{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1 class="grow" style="margin:0">현황판</h1>
+  <form><input type="month" name="ym" value="{{ ym }}" onchange="this.form.submit()"></form>
+</div>
+<div class="cards">
+  <div class="card"><div class="k">관리 빌라</div><div class="v">{{ stats.buildings }}곳</div></div>
+  <div class="card"><div class="k">세대 (공실)</div><div class="v">{{ stats.units }} <span class="muted" style="font-size:15px">({{ stats.vacant }})</span></div></div>
+  <div class="card"><div class="k">{{ ym|ymk }} 부과액</div><div class="v">{{ stats.billed|won }}</div></div>
+  <div class="card"><div class="k">{{ ym|ymk }} 수납액</div><div class="v ok">{{ stats.paid|won }}</div></div>
+  <div class="card"><div class="k">{{ ym|ymk }} 미수납</div><div class="v neg">{{ stats.month_owed|won }}</div></div>
+  <div class="card"><div class="k">전체 미납 ({{ stats.owed_units }}세대)</div><div class="v neg">{{ stats.total_owed|won }}</div></div>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0">이번 달 할 일</h2>
+  <ol>
+    <li><a href="{{ url_for('readings') }}">검침 입력</a> — 세대별 전기·수도·가스 지침과 빌라 전체 고지금액 입력</li>
+    <li><a href="{{ url_for('calc') }}">관리비 계산</a> — 빌라를 선택해 월 관리비 부과</li>
+    <li><a href="{{ url_for('bills') }}">고지서 출력</a></li>
+    <li><a href="{{ url_for('payments') }}">수납 입력</a> → <a href="{{ url_for('unpaid') }}">미납 확인·독촉장</a></li>
+  </ol>
+</div>
+
+<h2>최근 수납</h2>
+<table>
+  <tr><th>수납일</th><th>빌라</th><th>호수</th><th class="r">금액</th><th>방법</th><th>입금자</th></tr>
+  {% for p in recent %}
+  <tr><td>{{ p.pay_date }}</td><td>{{ p.building_name }}</td><td><a href="{{ url_for('unit_ledger', uid=p.unit_id) }}">{{ p.ho }}</a></td>
+      <td class="r">{{ p.amount|won }}</td><td>{{ p.method or '' }}</td><td>{{ p.payer or '' }}</td></tr>
+  {% else %}
+  <tr><td colspan="6" class="muted c">수납 기록이 없습니다.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

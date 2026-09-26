@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>독촉장</title>
+<style>
+  @page { size: A4; margin: 15mm; }
+  body { font-family: "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 13px; margin: 0; background: #e9ecef; }
+  .bar { position: sticky; top: 0; background: #1d2b3a; color: #fff; padding: 10px 16px; display: flex; gap: 12px; align-items: center; }
+  .bar button { font: inherit; padding: 6px 14px; cursor: pointer; }
+  .sheet { background: #fff; width: 180mm; margin: 10px auto; padding: 14mm; box-sizing: border-box; border: 1px solid #bbb; }
+  h1 { text-align: center; letter-spacing: 16px; font-size: 26px; margin: 0 0 24px; }
+  .to { font-size: 16px; margin-bottom: 18px; }
+  .text { line-height: 1.8; white-space: pre-wrap; margin-bottom: 18px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  th, td { border: 1px solid #555; padding: 5px 8px; }
+  th { background: #eee; }
+  .r { text-align: right; }
+  .sum td { font-weight: 700; font-size: 15px; }
+  .from { text-align: right; margin-top: 30px; font-size: 15px; }
+  @media print { body { background: #fff; } .bar { display: none; } .sheet { border: none; margin: 0; width: auto; page-break-after: always; } }
+</style>
+</head>
+<body>
+<div class="bar"><span>독촉장 {{ rows|length }}장</span><button onclick="print()">인쇄</button></div>
+{% for r in rows %}
+<div class="sheet">
+  <h1>독촉장</h1>
+  <div class="to"><b>{{ r.building_name }} {{ r.ho }}호</b> {{ r.tenant or '' }} 귀하</div>
+  <div class="text">{{ s.dunning_text }}</div>
+  <table>
+    <tr><th>부과월</th><th class="r">부과액</th><th class="r">연체료</th><th class="r">수납액</th><th class="r">미납액</th></tr>
+    {% for b in r.bills %}
+    <tr><td>{{ '이월 미납' if b.kind == 'carry' else b.ym|ymk }}</td><td class="r">{{ b.amount|won }}</td><td class="r">{{ b.late_applied|won }}</td>
+      <td class="r">{{ b.paid|won }}</td><td class="r">{{ b.owed|won }}</td></tr>
+    {% endfor %}
+    <tr class="sum"><td colspan="4">미납 합계</td><td class="r">{{ r.owed|won }}원</td></tr>
+  </table>
+  {% if deadline %}<p><b>납부 기한: {{ deadline }}</b></p>{% endif %}
+  {% if s.bank_info %}<p>입금계좌: {{ s.bank_info }}</p>{% endif %}
+  <div class="from">{{ today }}<br><br><b>{{ s.company_name }}</b>{% if s.company_phone %}<br>문의 {{ s.company_phone }}{% endif %}</div>
+</div>
+{% else %}<div class="sheet">선택한 세대가 없거나 미납액이 없습니다.</div>{% endfor %}
+</body>
+</html>

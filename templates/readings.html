@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}검침 입력{% endblock %}
+{% block content %}
+<h1>① 검침 입력</h1>
+<form class="toolbar">
+  <select name="building_id" onchange="this.form.submit()">
+    {% for x in blist %}<option value="{{ x.id }}" {{ 'selected' if b and x.id == b.id }}>{{ x.name }}</option>{% endfor %}
+  </select>
+  <input type="month" name="ym" value="{{ ym }}" onchange="this.form.submit()">
+</form>
+{% if not b %}
+<p class="muted">먼저 빌라를 등록하세요.</p>
+{% else %}
+<form method="post" class="readings">
+  {{ csrf() }}
+  <input type="hidden" name="building_id" value="{{ b.id }}"><input type="hidden" name="ym" value="{{ ym }}">
+  <div class="panel">
+    <h2 style="margin-top:0">{{ b.name }} {{ ym|ymk }} 빌라 전체 고지금액</h2>
+    <table style="max-width:640px">
+      <tr><th>구분</th><th>부과 방식</th><th class="r">고지금액(원)</th><th class="r">단가(원)</th></tr>
+      {% for util, label in UTILS.items() %}{% set m = b[util ~ '_method'] %}{% if m != 'none' %}
+      <tr><td>{{ label }}</td><td class="muted">{{ METHODS[m] }}</td>
+        <td>{% if m in ('ratio','equal') %}<input class="num" name="bb_amount_{{ util }}" value="{{ bbills[util].amount|won if util in bbills else '' }}" style="width:130px">{% endif %}</td>
+        <td>{% if m == 'price' %}<input class="num" name="bb_price_{{ util }}" value="{{ fmt(bbills[util].unit_price) if util in bbills else '' }}" style="width:100px">{% endif %}</td></tr>
+      {% endif %}{% endfor %}
+      {% if b.common_method == 'equal' %}
+      <tr><td>공용전기</td><td class="muted">세대 균등 분할</td>
+        <td><input class="num" name="bb_amount_common" value="{{ bbills['common'].amount|won if 'common' in bbills else '' }}" style="width:130px"></td><td></td></tr>
+      {% endif %}
+    </table>
+    {% if b.water_method == 'none' and b.elec_method == 'none' and b.gas_method == 'none' and b.common_method == 'none' %}
+      <p class="muted">이 빌라는 공과금을 부과하지 않도록 설정되어 있습니다. <a href="{{ url_for('building_edit', bid=b.id) }}">빌라 정보</a>에서 부과 방식을 바꿀 수 있습니다.</p>
+    {% endif %}
+  </div>
+
+  {% if utils %}
+  <p class="muted">전월 지침은 지난 검침에서 자동으로 가져옵니다. 당월 지침만 입력하세요. (Enter 키로 다음 칸 이동)</p>
+  <table>
+    <tr><th rowspan="2">호수</th><th rowspan="2">입주자</th>
+      {% for util in utils %}<th colspan="3" class="c">{{ UTILS[util] }} ({{ UTIL_UNITS[util] }})</th>{% endfor %}</tr>
+    <tr>{% for util in utils %}<th class="r">전월</th><th class="r">당월</th><th class="r">사용량</th>{% endfor %}</tr>
+    {% for row in grid %}
+    <tr {% if row.u.status == '공실' %}class="muted"{% endif %}>
+      <td><b>{{ row.u.ho }}</b>{% if row.u.status == '공실' %} <span class="tag vacant">공실</span>{% endif %}</td>
+      <td>{{ row.u.tenant or '' }}</td>
+      {% for util in utils %}{% set pv, cv = row.vals[util] %}
+      <td><input class="num" name="prev_{{ row.u.id }}_{{ util }}" value="{{ fmt(pv) }}" data-pair="{{ row.u.id }}_{{ util }}"></td>
+      <td><input class="num cur" name="curr_{{ row.u.id }}_{{ util }}" value="{{ fmt(cv) }}" data-pair="{{ row.u.id }}_{{ util }}"></td>
+      <td class="r use" id="use_{{ row.u.id }}_{{ util }}"></td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  <p><button>검침 저장</button> <a href="{{ url_for('calc', ym=ym) }}">→ 관리비 계산으로</a></p>
+</form>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+const num = s => parseFloat(String(s).replace(/,/g, ''));
+function refresh(key) {
+  const p = num(document.querySelector(`[name=prev_${key}]`).value), c = num(document.querySelector(`[name=curr_${key}]`).value);
+  const cell = document.getElementById('use_' + key);
+  if (isNaN(p) || isNaN(c)) { cell.textContent = ''; return; }
+  const u = Math.round((c - p) * 100) / 100;
+  cell.textContent = u.toLocaleString();
+  cell.className = 'r use' + (u < 0 ? ' neg' : '');
+}
+document.querySelectorAll('[data-pair]').forEach(el => {
+  el.addEventListener('input', () => refresh(el.dataset.pair));
+  refresh(el.dataset.pair);
+});
+const curs = [...document.querySelectorAll('input.cur')];
+curs.forEach((el, i) => el.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); (curs[i + 1] || el).focus(); (curs[i + 1] || el).select(); }
+}));
+</script>
+{% endblock %}

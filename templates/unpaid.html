@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}미납 관리{% endblock %}
+{% block content %}
+<h1>미납 관리·독촉장</h1>
+<form class="toolbar">
+  <select name="building_id"><option value="">전체 빌라</option>
+    {% for x in blist %}<option value="{{ x.id }}" {{ 'selected' if x.id == bid }}>{{ x.name }}</option>{% endfor %}</select>
+  <select name="months">{% for m in [1,2,3,6] %}<option value="{{ m }}" {{ 'selected' if m == months }}>{{ m }}개월 이상 미납</option>{% endfor %}</select>
+  <button class="light">조회</button>
+  <span class="grow"></span>
+  <span>{{ rows|length }}세대 · 미납 합계 <b class="neg">{{ total|won }}</b>원</span>
+</form>
+<form action="{{ url_for('unpaid_print') }}" target="_blank">
+  <table>
+    <tr><th class="c"><input type="checkbox" onclick="document.querySelectorAll('.uchk').forEach(c => c.checked = this.checked)"></th>
+      <th>빌라</th><th>호수</th><th>입주자</th><th>연락처</th><th>미납 내역</th><th class="r">개월</th><th class="r">미납액(연체료 포함)</th></tr>
+    {% for r in rows %}
+    <tr><td class="c"><input type="checkbox" class="uchk" name="unit_id" value="{{ r.unit_id }}"></td>
+      <td>{{ r.building_name }}</td><td><a href="{{ url_for('unit_ledger', uid=r.unit_id) }}">{{ r.ho }}</a></td><td>{{ r.tenant or '' }}</td><td>{{ r.mobile or '' }}</td>
+      <td class="muted">{% for b in r.bills %}{{ '이월' if b.kind == 'carry' else b.ym }}{{ ', ' if not loop.last }}{% endfor %}</td>
+      <td class="r">{{ r.bills|length }}</td><td class="r neg">{{ r.owed|won }}</td></tr>
+    {% else %}<tr><td colspan="8" class="c muted">미납 세대가 없습니다.</td></tr>{% endfor %}
+  </table>
+  {% if rows %}
+  <div class="toolbar" style="margin-top:12px">
+    <label>납부 요청 기한 <input type="date" name="deadline"></label>
+    <button>선택 세대 독촉장 출력</button>
+  </div>
+  {% endif %}
+</form>
+{% endblock %}

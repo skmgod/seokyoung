@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}기존 자료 가져오기{% endblock %}
+{% block content %}
+<h1>기존 자료 가져오기</h1>
+<div class="panel">
+  <h2 style="margin-top:0">방법</h2>
+  <ol>
+    <li>기존 프로그램의 조회 화면(입주자 카드, 미납 현황 등)에서 <b>엑셀로 저장</b>합니다.</li>
+    <li>엑셀 첫 줄에 열 이름이 있어야 합니다. 인식하는 이름: 빌라명, 주소, 호수, 성명(입주자·계약자), 핸드폰, 전화번호, 입주일, 보증금, 임대료, 월관리비, 미납액, 상태(공실), 비고</li>
+    <li>열 이름이 다르면 엑셀에서 이름만 바꾸거나, <a href="{{ url_for('import_template') }}">양식 파일</a>의 첫 시트에 붙여넣어 올리세요. (작성 예시는 두 번째 시트에 있으며, 첫 시트만 읽습니다.)</li>
+    <li>올리면 먼저 <b>미리보기</b>가 나오고, 확인 후 저장됩니다. 같은 빌라·호수가 이미 있으면 정보가 갱신됩니다.</li>
+  </ol>
+  <p class="muted">미납액 열이 있으면 세대마다 '이월 미납' 부과 건으로 들어가며, 이후 수납하면 이월 미납부터 차감됩니다. 월관리비 열은 세대별 '일반관리비' 금액으로 들어갑니다.</p>
+</div>
+<form method="post" enctype="multipart/form-data" class="panel">
+  {{ csrf() }}
+  <input type="file" name="file" accept=".xlsx,.xlsm,.csv" required>
+  <button>미리보기</button>
+  <a class="btn light" href="{{ url_for('import_template') }}">양식 내려받기</a>
+</form>
+{% endblock %}

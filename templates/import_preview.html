@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}가져오기 미리보기{% endblock %}
+{% block content %}
+<h1>가져오기 미리보기</h1>
+<div class="panel">
+  <b>열 인식 결과:</b>
+  {% for k, v in data.mapping.items() %}<span class="tag">{{ k }} ← {{ v }}</span> {% endfor %}
+  {% if data.errors %}<ul class="warnlist">{% for e in data.errors[:20] %}<li>{{ e }}</li>{% endfor %}{% if data.errors|length > 20 %}<li>외 {{ data.errors|length - 20 }}건</li>{% endif %}</ul>{% endif %}
+</div>
+<p>총 <b>{{ data.rows|length }}</b>세대 · 빌라 <b>{{ data.rows|map(attribute='building')|unique|list|length }}</b>곳 ·
+  미납 이월 <b>{{ data.rows|selectattr('unpaid')|list|length }}</b>세대 ({{ data.rows|sum(attribute='unpaid')|won }}원)</p>
+<form method="post" action="{{ url_for('import_commit') }}" class="panel">
+  {{ csrf() }}
+  <input type="hidden" name="token" value="{{ token }}">
+  <div class="toolbar">
+    <label>이월 미납 기준월 <input type="month" name="carry_ym" value="{{ carry_ym }}"></label>
+    <label>이월일 <input type="date" name="carry_date" value="{{ carry_date }}"></label>
+    <button onclick="return confirm('{{ data.rows|length }}세대를 저장합니까?')">저장</button>
+    <a class="btn light" href="{{ url_for('import_page') }}">취소</a>
+  </div>
+</form>
+<table>
+  <tr><th>줄</th><th>빌라명</th><th>호수</th><th>상태</th><th>성명</th><th>핸드폰</th><th>입주일</th><th class="r">보증금</th><th class="r">임대료</th><th class="r">월관리비</th><th class="r">미납액</th></tr>
+  {% for r in data.rows[:300] %}
+  <tr><td class="muted">{{ r.row }}</td><td>{{ r.building }}</td><td>{{ r.ho }}</td><td>{{ r.status }}</td><td>{{ r.tenant }}</td><td>{{ r.mobile or r.phone }}</td>
+    <td>{{ r.move_in }}</td><td class="r">{{ r.deposit|won }}</td><td class="r">{{ r.rent|won }}</td><td class="r">{{ r.mgmt|won }}</td><td class="r">{{ r.unpaid|won }}</td></tr>
+  {% endfor %}
+</table>
+{% if data.rows|length > 300 %}<p class="muted">처음 300줄만 표시했습니다.</p>{% endif %}
+{% endblock %}

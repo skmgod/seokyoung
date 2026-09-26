@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}일괄 수납{% endblock %}
+{% block content %}
+<h1>일괄 수납</h1>
+<p class="muted">자동이체·지로 결과처럼 여러 세대가 한꺼번에 완납한 경우, 체크한 세대의 미납액 전액을 수납 처리합니다.</p>
+<form class="toolbar">
+  <input type="month" name="ym" value="{{ ym }}">
+  <select name="building_id"><option value="">전체 빌라</option>
+    {% for x in blist %}<option value="{{ x.id }}" {{ 'selected' if x.id == bid }}>{{ x.name }}</option>{% endfor %}</select>
+  <button class="light">조회</button>
+</form>
+<form method="post">
+  {{ csrf() }}
+  <input type="hidden" name="ym" value="{{ ym }}"><input type="hidden" name="building_id" value="{{ bid or '' }}">
+  <table>
+    <tr><th class="c"><input type="checkbox" onclick="document.querySelectorAll('.pchk').forEach(c => c.checked = this.checked)"></th>
+      <th>빌라</th><th>호수</th><th>입주자</th><th class="r">부과액</th><th class="r">수납</th><th class="r">미납액</th></tr>
+    {% for r in rows %}
+    <tr><td class="c"><input type="checkbox" class="pchk" name="bill_ids" value="{{ r.id }}"></td><td>{{ r.building_name }}</td><td>{{ r.ho }}</td>
+      <td>{{ r.tenant or '' }}</td><td class="r">{{ r.amount|won }}</td><td class="r">{{ r.paid|won }}</td><td class="r neg">{{ r.owed|won }}</td></tr>
+    {% else %}<tr><td colspan="7" class="c muted">{{ ym|ymk }} 미납 건이 없습니다.</td></tr>{% endfor %}
+  </table>
+  {% if rows %}
+  <div class="toolbar" style="margin-top:12px">
+    <label>수납일 <input type="date" name="pay_date" value="{{ today }}"></label>
+    <select name="method">{% for m in ['자동이체','지로','무통장입금','현금','인터넷뱅킹'] %}<option>{{ m }}</option>{% endfor %}</select>
+    <button onclick="return confirm('체크한 세대를 전액 수납 처리합니까?')">선택 세대 수납 처리</button>
+  </div>
+  {% endif %}
+</form>
+{% endblock %}

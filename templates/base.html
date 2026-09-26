@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}주택관리{% endblock %} - 크라우드 주택관리</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% block head %}{% endblock %}
+</head>
+<body>
+{% macro csrf() %}<input type="hidden" name="csrf" value="{{ csrf_token }}">{% endmacro %}
+{% if user %}
+<div class="layout">
+  <nav class="side">
+    <div class="brand">크라우드 주택관리</div>
+    {% set ep = request.endpoint %}
+    <a href="{{ url_for('dashboard') }}" class="{{ 'on' if ep == 'dashboard' }}">현황판</a>
+    <div class="group">기초 자료</div>
+    <a href="{{ url_for('buildings') }}" class="{{ 'on' if ep in ('buildings','building_edit','unit_edit','unit_ledger') }}">빌라·세대 관리</a>
+    <div class="group">월 업무</div>
+    <a href="{{ url_for('readings') }}" class="{{ 'on' if ep == 'readings' }}">① 검침 입력</a>
+    <a href="{{ url_for('calc') }}" class="{{ 'on' if ep == 'calc' }}">② 관리비 계산</a>
+    <a href="{{ url_for('bills') }}" class="{{ 'on' if ep == 'bills' }}">③ 부과 내역·고지서</a>
+    <a href="{{ url_for('payments') }}" class="{{ 'on' if ep == 'payments' }}">④ 수납 입력</a>
+    <a href="{{ url_for('payments_bulk') }}" class="{{ 'on' if ep == 'payments_bulk' }}">일괄 수납</a>
+    <a href="{{ url_for('unpaid') }}" class="{{ 'on' if ep == 'unpaid' }}">미납 관리·독촉장</a>
+    <div class="group">환경</div>
+    <a href="{{ url_for('settings_page') }}" class="{{ 'on' if ep == 'settings_page' }}">설정</a>
+    {% if user.is_admin %}<a href="{{ url_for('import_page') }}" class="{{ 'on' if ep in ('import_page','import_commit') }}">기존 자료 가져오기</a>{% endif %}
+    <div class="me">{{ user.name }}님<br><a href="{{ url_for('password') }}">비밀번호 변경</a> · <a href="{{ url_for('logout') }}">로그아웃</a></div>
+  </nav>
+  <main class="main">
+    {% for cat, msg in get_flashed_messages(with_categories=true) %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% else %}
+  {% block public %}{% endblock %}
+{% endif %}
+{% block scripts %}{% endblock %}
+</body>
+</html>
