@@ -85,8 +85,10 @@ def inject():
 
 PUBLIC = {"login", "setup", "static"}
 
-# 로그인 사용 여부. 기본은 로그인 없이 바로 사용하고, 환경변수 REQUIRE_LOGIN=1 이면 아이디·비밀번호를 요구한다.
-REQUIRE_LOGIN = os.environ.get("REQUIRE_LOGIN", "").strip().lower() in ("1", "true", "yes", "on")
+# 로그인 사용 여부. 이 PC에서는 로그인 없이 바로 쓰고, 인터넷에 공개되는 서버리스(Vercel)에서는 로그인을 요구한다.
+# 환경변수 REQUIRE_LOGIN=1 / 0 으로 직접 정할 수 있다.
+_login_env = os.environ.get("REQUIRE_LOGIN", "").strip().lower()
+REQUIRE_LOGIN = _login_env in ("1", "true", "yes", "on") if _login_env else ON_SERVERLESS
 GUEST = {"id": 0, "username": "", "name": "관리자", "is_admin": 1, "pw_hash": ""}
 
 
