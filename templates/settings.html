@@ -43,7 +43,7 @@
   {% if not ro %}<p><button>항목 저장</button></p>{% endif %}
 </form>
 
-{% if user.is_admin %}
+{% if user.is_admin and require_login %}
 <div class="panel" id="users">
   <h2 style="margin-top:0">사용자</h2>
   <table style="max-width:640px">

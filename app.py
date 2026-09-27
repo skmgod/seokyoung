@@ -80,10 +80,14 @@ def inject():
         session["csrf"] = secrets.token_hex(16)
     return {"csrf_token": session["csrf"], "METHODS": billing.METHODS, "UTILS": billing.UTILS,
             "user": g.get("user"), "today": today(), "this_ym": this_ym(),
-            "db_kind": "Supabase" if IS_PG else "이 PC (SQLite)"}
+            "db_kind": "Supabase" if IS_PG else "이 PC (SQLite)", "require_login": REQUIRE_LOGIN}
 
 
 PUBLIC = {"login", "setup", "static"}
+
+# 로그인 사용 여부. 기본은 로그인 없이 바로 사용하고, 환경변수 REQUIRE_LOGIN=1 이면 아이디·비밀번호를 요구한다.
+REQUIRE_LOGIN = os.environ.get("REQUIRE_LOGIN", "").strip().lower() in ("1", "true", "yes", "on")
+GUEST = {"id": 0, "username": "", "name": "관리자", "is_admin": 1, "pw_hash": ""}
 
 
 @app.before_request
@@ -98,7 +102,11 @@ def guard():
         return None
     db = get_db()
     g.user = None
-    if request.endpoint in PUBLIC:
+    if not REQUIRE_LOGIN:
+        g.user = GUEST
+        if request.endpoint in ("login", "setup", "password"):
+            return redirect(url_for("dashboard"))
+    elif request.endpoint in PUBLIC:
         pass
     elif db.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
         return redirect(url_for("setup"))
