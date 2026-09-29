@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}작업 메모·고장신고{% endblock %}
+{% block content %}
+{% set back = request.full_path %}
+<h1>작업 메모·고장신고 <span class="muted" style="font-size:14px;font-weight:400">미완료 {{ todo }}건</span></h1>
+
+<form class="wsearch" method="get">
+  <input name="q" value="{{ q }}" placeholder="🔍 통합검색 — 이름, 전화번호, 건물 이름, 고장 내용, 메모" autofocus>
+  {% if status %}<input type="hidden" name="s" value="{{ status }}">{% endif %}
+  <button>검색</button>
+  {% if q %}<a class="btn light" href="{{ url_for('work.index', s=status or None) }}">지우기</a>{% endif %}
+</form>
+
+<details class="panel wnew" {{ 'open' if not rows and not q }}>
+  <summary>＋ 새 작업 메모 쓰기</summary>
+  <form method="post" action="{{ url_for('work.new') }}">
+    {{ csrf() }}<input type="hidden" name="back" value="{{ back }}">
+    {% with w = None %}{% include "work_form.html" %}{% endwith %}
+    <button style="margin-top:10px">저장</button>
+  </form>
+</details>
+
+<div class="toolbar">
+  <a class="btn small {{ '' if not status else 'light' }}" href="{{ url_for('work.index', q=q or None) }}">전체</a>
+  <a class="btn small {{ '' if status == 'todo' else 'light' }}" href="{{ url_for('work.index', q=q or None, s='todo') }}">미완료</a>
+  <a class="btn small {{ '' if status == 'done' else 'light' }}" href="{{ url_for('work.index', q=q or None, s='done') }}">완료</a>
+  <span class="grow"></span>
+  <span class="muted">{{ rows|length }}건 · 원가 {{ total.cost|won }} · 받은 금액 {{ total.received|won }} · 차익
+    <b class="{{ 'neg' if total.profit < 0 else 'ok' }}">{{ total.profit|won }}</b></span>
+</div>
+
+{% for w in rows %}
+<div class="wcard {{ 'done' if w.done }}">
+  <form method="post" action="{{ url_for('work.toggle', wid=w.id) }}">
+    {{ csrf() }}<input type="hidden" name="back" value="{{ back }}">
+    <button class="wbox" title="{{ '완료 취소' if w.done else '완료로 체크' }}">{{ '✓' if w.done }}</button>
+  </form>
+  <a class="wbody" href="{{ url_for('work.edit', wid=w.id, back=back) }}">
+    <div class="wtop"><b>{{ w.building or '건물 미입력' }}</b>
+      {% if w.tenant %}<span>{{ w.tenant }}</span>{% endif %}
+      <span class="muted">{{ w.work_date }}</span></div>
+    {% if w.issue %}<div class="wissue">🔧 {{ w.issue }}</div>{% endif %}
+    {% if w.memo %}<div class="wmemo">📝 {{ w.memo }}</div>{% endif %}
+    <div class="wmoney">원가 {{ w.cost|won }} · 받은 금액 {{ w.received|won }} · 차익
+      <b class="{{ 'neg' if w.received - w.cost < 0 else 'ok' }}">{{ (w.received - w.cost)|won }}</b></div>
+  </a>
+  {% if w.phone %}<a class="wtel" href="tel:{{ w.phone }}">📞 {{ w.phone }}</a>{% endif %}
+</div>
+{% else %}
+<div class="panel muted">{{ '검색 결과가 없습니다.' if q else '아직 적은 작업이 없습니다. 위의 [새 작업 메모 쓰기]를 눌러 보세요.' }}</div>
+{% endfor %}
+{% endblock %}
+{% block scripts %}{% include "work_js.html" %}{% endblock %}

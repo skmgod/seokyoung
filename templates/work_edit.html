@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}작업 메모 수정{% endblock %}
+{% block content %}
+<h1><a href="{{ back }}">‹</a> 작업 메모 수정</h1>
+<form class="panel" method="post">
+  {{ csrf() }}
+  {% include "work_form.html" %}
+  <div class="toolbar" style="margin:12px 0 0">
+    <button>저장</button><a class="btn light" href="{{ back }}">취소</a><span class="grow"></span>
+    <button class="danger" form="del">삭제</button>
+  </div>
+</form>
+<form id="del" method="post" action="{{ url_for('work.delete', wid=w.id) }}" onsubmit="return confirm('삭제할까요?')">{{ csrf() }}</form>
+{% endblock %}
+{% block scripts %}{% include "work_js.html" %}{% endblock %}

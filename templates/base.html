@@ -15,7 +15,7 @@
     <div class="brand">크라우드 주택관리</div>
     {% set ep = request.endpoint %}
     <a href="{{ url_for('dashboard') }}" class="{{ 'on' if ep == 'dashboard' }}">현황판</a>
-    <a href="{{ url_for('schedule.home') }}">관리 스케줄 📅</a>
+    <a href="{{ url_for('work.index') }}" class="{{ 'on' if ep in ('work.index','work.edit') }}">작업 메모·고장신고</a>
     <div class="group">기초 자료</div>
     <a href="{{ url_for('buildings') }}" class="{{ 'on' if ep in ('buildings','building_edit','unit_edit','unit_ledger') }}">빌라·세대 관리</a>
     <div class="group">월 업무</div>

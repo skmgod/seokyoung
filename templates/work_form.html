@@ -1,0 +1,14 @@
+{# 작업 메모 입력칸 (새로 쓰기·수정 공통). w 가 없으면 새로 쓰기 #}
+<div class="wf">
+  <label>날짜<input type="date" name="work_date" value="{{ w.work_date if w else today_s }}"></label>
+  <label>건물 이름<input name="building" list="blist" value="{{ w.building or '' if w }}" placeholder="예) 서경빌라"></label>
+  <label>세입자 이름<input name="tenant" value="{{ w.tenant or '' if w }}" placeholder="예) 홍길동 (201호)"></label>
+  <label>전화번호<input name="phone" type="tel" value="{{ w.phone or '' if w }}" placeholder="010-0000-0000"></label>
+  <label class="wide">고장신고 내용<textarea name="issue" rows="2" placeholder="예) 욕실 수전 누수">{{ w.issue or '' if w }}</textarea></label>
+  <label class="wide">메모<textarea name="memo" rows="2" placeholder="부품, 업체, 방문 시간 등">{{ w.memo or '' if w }}</textarea></label>
+  <label>제품 원가<input name="cost" class="num money" inputmode="numeric" value="{{ w.cost|won if w and w.cost }}" placeholder="0"></label>
+  <label>받은 금액<input name="received" class="num money" inputmode="numeric" value="{{ w.received|won if w and w.received }}" placeholder="0"></label>
+  <label>차익 (자동)<input class="num profit" readonly tabindex="-1" value="0"></label>
+  <label class="chk"><input type="checkbox" name="done" value="1" {{ 'checked' if w and w.done }}> 완료</label>
+</div>
+<datalist id="blist">{% for n in blist %}<option value="{{ n }}">{% endfor %}</datalist>

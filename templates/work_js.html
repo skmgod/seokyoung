@@ -1,0 +1,21 @@
+<script>
+// 금액칸에 콤마를 넣고, 받은 금액 - 제품 원가 = 차익 을 바로 계산한다
+document.querySelectorAll('form').forEach(function (f) {
+  var cost = f.querySelector('[name=cost]'), rec = f.querySelector('[name=received]'), out = f.querySelector('.profit');
+  if (!cost || !rec || !out) return;
+  var num = function (el) { return parseInt(el.value.replace(/[^0-9-]/g, ''), 10) || 0; };
+  var calc = function () {
+    var p = num(rec) - num(cost);
+    out.value = p.toLocaleString('ko-KR');
+    out.classList.toggle('neg', p < 0);
+  };
+  [cost, rec].forEach(function (el) {
+    el.addEventListener('input', function () {
+      var n = el.value.replace(/[^0-9]/g, '');
+      el.value = n ? parseInt(n, 10).toLocaleString('ko-KR') : '';
+      calc();
+    });
+  });
+  calc();
+});
+</script>

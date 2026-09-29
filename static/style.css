@@ -75,3 +75,47 @@ tr:hover td { background: #fafcff; }
   body { background: #fff; }
   .main { padding: 0; }
 }
+
+/* 작업 메모·고장신고 */
+.wsearch { display: flex; gap: 8px; margin-bottom: 12px; }
+.wsearch input { flex: 1; font-size: 16px; padding: 10px 12px; border-radius: 8px; }
+.wsearch button, .wsearch .btn { padding: 10px 16px; border-radius: 8px; white-space: nowrap; }
+.wnew summary { cursor: pointer; font-weight: 700; color: var(--primary); }
+.wnew form { margin-top: 12px; }
+.wf { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px 14px; }
+.wf label { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--muted); }
+.wf label input, .wf label textarea { color: var(--text); font-size: 15px; padding: 8px 10px; }
+.wf .wide { grid-column: 1 / -1; }
+.wf .profit { background: #f4f6f9; font-weight: 700; color: var(--ok); }
+.wf .profit.neg { color: var(--danger); }
+.wf .chk { flex-direction: row; align-items: center; gap: 8px; font-size: 15px; color: var(--text); padding-top: 18px; }
+.wf .chk input { width: 22px; height: 22px; }
+.wcard { display: flex; align-items: flex-start; gap: 12px; background: #fff; border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+.wcard .wbody { flex: 1; min-width: 0; color: var(--text); }
+.wcard .wbody:hover { text-decoration: none; }
+.wbox { width: 28px; height: 28px; padding: 0; border: 2px solid #9aa6b2; border-radius: 5px; background: #fff;
+  color: #fff; font-size: 18px; font-weight: 700; line-height: 1; }
+.wbox:hover { background: #eef4fb; }
+.wcard.done .wbox { background: var(--ok); border-color: var(--ok); }
+.wcard.done { background: #f7f9fb; }
+.wcard.done .wissue, .wcard.done .wtop b { text-decoration: line-through; color: var(--muted); }
+.wtop { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.wtop b { font-size: 15px; }
+.wissue, .wmemo { margin-top: 4px; white-space: pre-wrap; word-break: break-all; }
+.wmemo { color: #4a5563; font-size: 13px; }
+.wmoney { margin-top: 6px; font-size: 13px; color: var(--muted); }
+.wtel { white-space: nowrap; padding: 6px 10px; border: 1px solid var(--line); border-radius: 16px; font-size: 13px; }
+
+@media (max-width: 700px) {
+  .layout { flex-direction: column; }
+  .side { width: auto; display: flex; flex-wrap: wrap; padding: 8px; gap: 2px; }
+  .side .brand { width: 100%; border: 0; padding: 4px 8px 8px; }
+  .side .group, .side .me { display: none; }
+  .side a { padding: 6px 10px; border-radius: 14px; font-size: 13px; }
+  .main { padding: 14px; }
+  .wcard { flex-wrap: wrap; }
+  .wcard .wbody { flex-basis: calc(100% - 40px); }
+  .wtel { margin-left: 40px; }
+  .wsearch input { min-width: 0; }
+}
