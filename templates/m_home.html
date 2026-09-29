@@ -1,0 +1,121 @@
+{% extends "m_base.html" %}
+{% from "m_macros.html" import toggle_btn, ev_link, row with context %}
+{% block content %}
+{% set back = request.full_path %}
+<section class="m-hero">
+  <div class="m-top">
+    <div class="m-brand">SEOKYOUNG<b>관리</b>SCHEDULE</div>
+    <a class="m-bell" href="#overdue" title="밀린 일정">🔔{% if overdue %}<i></i>{% endif %}</a>
+  </div>
+  <h1>오늘도 빌라 관리,<br>차근차근 해봐요!</h1>
+  <div class="sub">{{ t.year }}년 {{ t.month }}월 {{ t.day }}일 {{ WEEKDAYS[t.weekday()] }}요일</div>
+  <div class="pager">오늘 {{ today_list|length }}건</div>
+  <div class="deco">🗓️</div>
+</section>
+
+<div class="m-stamp">
+  <a href="{{ url_for('schedule.cal') }}"><span>✅</span> 이번 주 <span class="n">{{ week_done }}<span>/{{ week_total }}</span></span></a>
+  <a href="{{ url_for('schedule.all_list') }}"><span>📋</span> 전체일정</a>
+</div>
+
+<div class="m-yellowbox">
+  <h2>{{ user.name }}님, 오늘 할 일이에요 😃</h2>
+  {% if today_list %}
+  <div class="m-hscroll">
+    {% for e in today_list %}{% set c = CATS.get(e.category, CATS['기타']) %}
+    <a class="m-tile {{ 'done' if e.done }}" href="{{ ev_link(e, back) }}">
+      <div class="box" style="background:#fff">
+        <span class="emo">{{ c[0] }}</span>
+        {% if e.time %}<span class="time">{{ e.time }}</span>{% endif %}
+        {% if e.done %}<span class="badge ok">완료</span>{% elif e.repeat != 'none' %}<span class="badge">{{ REPEATS[e.repeat] }}</span>{% endif %}
+      </div>
+      <div class="name">{{ e.title }}</div>
+      {% if e.building_name %}<div class="bname">{{ e.building_name }}</div>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="m-empty">오늘은 예정된 일정이 없어요. 여유로운 하루 되세요 ☕<br>
+    <a class="m-pill small" style="margin-top:12px;border-color:var(--m-brown)" href="{{ url_for('schedule.edit', back=back) }}">＋ 일정 추가하기</a></div>
+  {% endif %}
+</div>
+
+{% if overdue %}
+<section class="m-sec" id="overdue">
+  {% for e in overdue[:3] %}{% set c = CATS.get(e.category, CATS['기타']) %}
+  <div class="m-card">
+    {{ toggle_btn(e, back) }}
+    <a class="txt" href="{{ ev_link(e, back) }}">
+      <div class="l1">{{ e.date|md }} · {{ e.building_name or e.category }}</div>
+      <div class="l2">{{ e.title }}</div>
+      <div class="l3 c-red">아직 안 했어요!</div>
+    </a>
+    <div class="ico" style="background:{{ c[1] }}">{{ c[0] }}</div>
+  </div>
+  {% endfor %}
+  {% if overdue|length > 3 %}<div class="c-muted" style="text-align:center;font-size:14px">밀린 일정 {{ overdue|length - 3 }}건 더 있어요</div>{% endif %}
+</section>
+{% endif %}
+
+<section class="m-sec">
+  {% for e in soon[:3] %}{% set c = CATS.get(e.category, CATS['기타']) %}
+  {% set dd = (e.date - t).days %}
+  <div class="m-card {{ 'done' if e.done }}">
+    <a class="txt" href="{{ ev_link(e, back) }}">
+      <div class="l1">{{ e.date|md }}{% if e.time %} {{ e.time }}{% endif %} · {{ e.building_name or e.category }}</div>
+      <div class="l2">{{ e.title }}</div>
+      <div class="l3 {{ ['c-orange','c-blue','c-red'][loop.index0 % 3] }}">{% if dd == 1 %}내일이에요{% else %}D-{{ dd }}{% endif %}</div>
+    </a>
+    <div class="ico" style="background:{{ c[1] }}">{{ c[0] }}</div>
+  </div>
+  {% else %}
+  <div class="m-card"><div class="txt"><div class="l1">앞으로 한 달</div><div class="l2">다가오는 일정이 없어요</div>
+    <div class="l3 c-orange">＋ 버튼으로 추가해 보세요 🎉</div></div><div class="ico" style="background:var(--m-yellow)">📅</div></div>
+  {% endfor %}
+</section>
+
+<section class="m-sec">
+  <div class="m-theme">
+    <div>
+      <h2>이번 달엔 뭐가 있지?<br>{{ m1.month }}월 관리 일정!</h2>
+      <div class="tags">#{{ m1.year }}년 #{{ m1.month }}월 #총{{ month|length }}건</div>
+      <a class="m-pill" href="{{ url_for('schedule.home', ym=next_ym) }}#month">↻ 다른 달 보기 &nbsp;<b>{{ m1.month }}/12</b></a>
+    </div>
+    <div class="art">🗓️</div>
+  </div>
+  <div class="m-circles" id="month">
+    {% for name, c in CATS.items() %}
+    <a class="m-circle" href="{{ url_for('schedule.all_list', cat=name) }}">
+      <div class="c" style="background:{{ c[1] }}">{{ c[0] }}{% if counts[name] %}<span class="badge">{{ counts[name] }}건</span>{% endif %}</div>
+      <div class="t">{{ name }}</div>
+      <div class="cnt">{{ counts[name] }}건</div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="m-sec">
+  <a class="m-banner" href="{{ url_for('schedule.cal', ym=m1.strftime('%Y-%m')) }}">
+    <div class="t1">놓치면<br>안 되는 {{ m1.month }}월!</div>
+    <div class="t2">달력에서 한눈에 확인하기 →</div>
+    <div class="emo">📆</div>
+    <div class="pager">{{ month|selectattr('done')|list|length }}/{{ month|length }}</div>
+  </a>
+</section>
+
+{% if soon|length > 3 %}
+<section class="m-sec" style="padding-left:0;padding-right:0">
+  <div class="m-list">
+    <div class="m-date" style="margin-top:0">다가오는 일정</div>
+    {% for e in soon[3:] %}{{ row(e, back, true) }}{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<div class="m-guide">
+  <div class="big">더 편해진 관리 스케줄</div>
+  <div class="small">반복 일정도 한 번에 🙌</div>
+  <p class="c-muted" style="font-size:14px;line-height:1.6">청소·검침·소방점검처럼 매주·매월 돌아오는 일은 <b>반복</b>을 골라 한 번만 등록하세요.
+    세대의 퇴실 예정일은 자동으로 일정에 나타나요.</p>
+</div>
+{% endblock %}

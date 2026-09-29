@@ -1,0 +1,34 @@
+{% extends "m_base.html" %}
+{% from "m_macros.html" import row with context %}
+{% block title %}달력 - 관리 스케줄{% endblock %}
+{% block content %}
+{% set back = request.full_path %}
+<div class="m-head"><h1>달력</h1>
+  <a class="m-pill small" href="{{ url_for('schedule.cal') }}">오늘</a></div>
+<div class="m-cal">
+  <div class="mon">
+    <a href="{{ url_for('schedule.cal', ym=prev_ym) }}">‹</a>
+    <b>{{ m1.year }}년 {{ m1.month }}월</b>
+    <a href="{{ url_for('schedule.cal', ym=next_ym) }}">›</a>
+  </div>
+  <table>
+    <tr>{% for w in '일월화수목금토' %}<th>{{ w }}</th>{% endfor %}</tr>
+    {% for week in weeks %}<tr>
+      {% for d in week %}{% set evs = by_day.get(d, []) %}
+      <td class="{{ 'out' if d.month != m1.month }} {{ 'sun' if d.weekday() == 6 }} {{ 'sat' if d.weekday() == 5 }} {{ 'today' if d == t }} {{ 'sel' if d == sel }}">
+        <a href="{{ url_for('schedule.cal', ym=d.strftime('%Y-%m'), d=d.isoformat()) }}">{{ d.day }}
+          <span class="dots">{% for e in evs[:3] %}<i style="background:{{ CATS.get(e.category, CATS['기타'])[2] if not e.done else '#ccc' }}"></i>{% endfor %}</span></a>
+      </td>{% endfor %}
+    </tr>{% endfor %}
+  </table>
+</div>
+<div class="m-list">
+  <div class="m-date" style="display:flex;justify-content:space-between;align-items:center">
+    <span>{{ sel|md }} 일정 {{ sel_list|length }}건</span>
+    <a class="m-pill small" href="{{ url_for('schedule.edit', d=sel.isoformat(), back=back) }}">＋ 추가</a>
+  </div>
+  {% for e in sel_list %}{{ row(e, back) }}{% else %}
+  <div class="m-row"><div class="txt"><div class="t c-muted" style="font-weight:600">이 날은 일정이 없어요</div></div></div>
+  {% endfor %}
+</div>
+{% endblock %}

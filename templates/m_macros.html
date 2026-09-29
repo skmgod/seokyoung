@@ -1,0 +1,23 @@
+{% macro toggle_btn(e, back) %}
+{% if e.auto %}<button class="m-check {{ 'on' if e.done }}" disabled title="세대 정보에서 자동 표시">✓</button>
+{% else %}<form method="post" action="{{ url_for('schedule.toggle', sid=e.id) }}" style="margin:0">
+  <input type="hidden" name="csrf" value="{{ csrf_token }}"><input type="hidden" name="date" value="{{ e.date.isoformat() }}">
+  <input type="hidden" name="back" value="{{ back }}">
+  <button class="m-check {{ 'on' if e.done }}" title="완료 표시">✓</button></form>{% endif %}
+{% endmacro %}
+
+{% macro ev_link(e, back) -%}
+{{ url_for('unit_edit', uid=e.id) if e.auto else url_for('schedule.edit', sid=e.id, back=back) }}
+{%- endmacro %}
+
+{% macro row(e, back, show_date=false) %}
+{% set c = CATS.get(e.category, CATS['기타']) %}
+<div class="m-row {{ 'done' if e.done }}">
+  <a class="emo" href="{{ ev_link(e, back) }}" style="background:{{ c[1] }}">{{ c[0] }}</a>
+  <a class="txt" href="{{ ev_link(e, back) }}">
+    <div class="t">{{ e.title }}</div>
+    <div class="s">{% if show_date %}{{ e.date|md }} · {% endif %}{% if e.time %}{{ e.time }} · {% endif %}{{ e.building_name or e.category }}{% if e.repeat != 'none' %} · 🔁 {{ REPEATS[e.repeat] }}{% endif %}</div>
+  </a>
+  {{ toggle_btn(e, back) }}
+</div>
+{% endmacro %}

@@ -170,6 +170,27 @@ CREATE TABLE IF NOT EXISTS import_jobs (
     created TEXT DEFAULT {now}
 );
 
+-- 관리 스케줄. repeat: none / weekly / monthly / yearly
+CREATE TABLE IF NOT EXISTS schedules (
+    id {pk},
+    title TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT '기타',
+    building_id INTEGER REFERENCES buildings(id) ON DELETE SET NULL,
+    start_date TEXT NOT NULL,
+    time TEXT,
+    repeat TEXT NOT NULL DEFAULT 'none',
+    repeat_until TEXT,
+    memo TEXT,
+    created TEXT DEFAULT {now}
+);
+
+-- 스케줄 완료 기록 (반복 일정은 날짜마다 따로 완료 처리)
+CREATE TABLE IF NOT EXISTS schedule_done (
+    schedule_id INTEGER NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+    date TEXT NOT NULL,
+    PRIMARY KEY (schedule_id, date)
+);
+
 CREATE INDEX IF NOT EXISTS idx_units_building ON units(building_id);
 CREATE INDEX IF NOT EXISTS idx_bills_unit ON bills(unit_id, ym);
 CREATE INDEX IF NOT EXISTS idx_bill_lines_bill ON bill_lines(bill_id);
@@ -180,7 +201,8 @@ CREATE INDEX IF NOT EXISTS idx_alloc_payment ON allocations(payment_id);
 """.format(**_TYPES)
 
 TABLES = ["users", "settings", "buildings", "units", "fee_items", "building_fees", "unit_fees", "readings",
-          "building_bills", "bills", "bill_lines", "payments", "allocations", "import_jobs"]
+          "building_bills", "bills", "bill_lines", "payments", "allocations", "import_jobs", "schedules",
+          "schedule_done"]
 
 DEFAULT_SETTINGS = {
     "company_name": "",

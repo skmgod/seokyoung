@@ -16,11 +16,13 @@ load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 import billing  # noqa: E402  (DATABASE_URL 을 읽은 뒤에 불러와야 함)
 import importer  # noqa: E402
+import schedule  # noqa: E402
 from db import IS_PG, close_db, get_db, get_settings, init_db  # noqa: E402
 
 app = Flask(__name__, instance_relative_config=True)
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
 app.teardown_appcontext(close_db)
+app.register_blueprint(schedule.bp)
 
 # Vercel 같은 서버리스 환경은 파일 시스템이 읽기 전용이고 요청이 끝나면 서버가 사라진다.
 # 그래서 자료는 반드시 Supabase(DATABASE_URL)에, 로그인 키는 SECRET_KEY 환경변수에 둬야 한다.
